@@ -3,8 +3,8 @@ import { supabase } from "../../supabaseClient";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-
 export default function ListaFakturKosztowych() {
+	const [selectAll, setSelectAll] = useState(false);
   const [faktury, setFaktury] = useState([
     {
       id: 1,
@@ -49,6 +49,17 @@ export default function ListaFakturKosztowych() {
 
 		fetchFaktury();
 	}, []);
+	
+	const toggleSelectAll = () => {
+		const newValue = !selectAll;
+		setSelectAll(newValue);
+		setFaktury(
+			faktury.map(f => ({
+				...f,
+				selected: newValue,
+			}))
+		);
+	};
 
   const [editValues, setEditValues] = useState({});
 
@@ -129,28 +140,40 @@ export default function ListaFakturKosztowych() {
 
 		// Utwórz tymczasowy element HTML z tabelą
 		const tableHtml = `
-			<div id="export-pdf">
-				<h2>Lista Faktur</h2>
-				<table border="1" cellspacing="0" cellpadding="4">
+			<div id="export-pdf" style="padding: 40px;">
+				<h1 style="
+					text-align: center;
+					font-family: Arial, sans-serif;
+					font-size: 20pt;
+					margin-bottom: 20px;
+				">
+					Lista Faktur
+				</h1>
+				<table style="
+					width: 100%;
+					border-collapse: collapse;
+					font-family: Arial, sans-serif;
+					font-size: 12pt;
+				">
 					<thead>
-						<tr>
-							<th>Nazwa</th>
-							<th>Nr Faktury</th>
-							<th>PLN</th>
-							<th>EUR</th>
-							<th>GBP</th>
-							<th>Data Płatności</th>
+						<tr style="background-color: #f0f0f0;">
+							<th style="border: 1px solid #333; padding: 8px 12px;">Nazwa</th>
+							<th style="border: 1px solid #333; padding: 8px 12px;">Nr Faktury</th>
+							<th style="border: 1px solid #333; padding: 8px 12px;">PLN</th>
+							<th style="border: 1px solid #333; padding: 8px 12px;">EUR</th>
+							<th style="border: 1px solid #333; padding: 8px 12px;">GBP</th>
+							<th style="border: 1px solid #333; padding: 8px 12px;">Data Płatności</th>
 						</tr>
 					</thead>
 					<tbody>
-						${data.map(f => `
-							<tr>
-								<td>${f.nazwa}</td>
-								<td>${f.nrFaktury}</td>
-								<td>${f.PLN}</td>
-								<td>${f.EUR}</td>
-								<td>${f.GBP}</td>
-								<td>${f.dataPlatnosci}</td>
+						${data.map((f, i) => `
+							<tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#fafafa'};">
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.nazwa || ""}</td>
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.nrFaktury || ""}</td>
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.PLN || 0}</td>
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.EUR || 0}</td>
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.GBP || 0}</td>
+								<td style="border: 1px solid #333; padding: 6px 10px;">${f.dataPlatnosci || ""}</td>
 							</tr>
 						`).join('')}
 					</tbody>
@@ -183,34 +206,71 @@ export default function ListaFakturKosztowych() {
 		const toPrint = faktury.filter((f) => f.selected);
 		const data = toPrint.length ? toPrint : faktury;
 
-		// Budujemy prosty HTML do wydruku
 		const html = `
 			<html>
 				<head>
 					<title>Lista Faktur</title>
 					<style>
-						table { width: 100%; border-collapse: collapse; }
-						th, td { border: 1px solid black; padding: 4px; text-align: left; }
-						th { background-color: #eee; }
+						@media print {
+							body {
+								margin: 20mm;
+								font-family: Arial, sans-serif;
+							}
+						}
+						body {
+							font-family: Arial, sans-serif;
+							margin: 40px;
+						}
+						h1 {
+							text-align: center;
+							margin-bottom: 30px;
+						}
+						table {
+							width: 100%;
+							border-collapse: collapse;
+							font-size: 12pt;
+						}
+						th, td {
+							border: 1px solid #333;
+							padding: 8px 12px;
+							text-align: left;
+						}
+						th {
+							background-color: #f0f0f0;
+						}
+						tr:nth-child(even) {
+							background-color: #fafafa;
+						}
+						thead {
+							display: table-header-group;
+						}
+						tfoot {
+							display: table-footer-group;
+						}
 					</style>
 				</head>
 				<body>
-					<h2>Lista Faktur</h2>
+					<h1>Lista Faktur</h1>
 					<table>
 						<thead>
 							<tr>
-								<th>Nazwa</th><th>Nr Faktury</th><th>Kwota</th><th>Data Płatności</th>
+								<th>Nazwa</th>
+								<th>Nr Faktury</th>
+								<th>PLN</th>
+								<th>EUR</th>
+								<th>GBP</th>
+								<th>Data Płatności</th>
 							</tr>
 						</thead>
 						<tbody>
 							${data.map(f => `
 								<tr>
-									<td>${f.nazwa}</td>
-									<td>${f.nrFaktury}</td>
-									<td>${f.PLN}</td>
-									<td>${f.EUR}</td>
-									<td>${f.GBP}</td>
-									<td>${f.dataPlatnosci}</td>
+									<td>${f.nazwa || ""}</td>
+									<td>${f.nrFaktury || ""}</td>
+									<td>${f.PLN || 0}</td>
+									<td>${f.EUR || 0}</td>
+									<td>${f.GBP || 0}</td>
+									<td>${f.dataPlatnosci || ""}</td>
 								</tr>
 							`).join('')}
 						</tbody>
@@ -219,8 +279,7 @@ export default function ListaFakturKosztowych() {
 			</html>
 		`;
 
-		// Otwieramy nowe okno i drukujemy
-		const printWindow = window.open('', '', 'width=800,height=600');
+		const printWindow = window.open('', '', 'width=1024,height=768');
 		printWindow.document.write(html);
 		printWindow.document.close();
 		printWindow.focus();
@@ -251,7 +310,13 @@ export default function ListaFakturKosztowych() {
 				<table className="min-w-full border table-fixed">
 					<thead>
 						<tr className="bg-gray-200">
-							<th className="p-2 border"><input type="checkbox" disabled /></th>
+							<th className="p-2 border">
+								<input
+									type="checkbox"
+									checked={selectAll}
+									onChange={toggleSelectAll}
+								/>
+							</th>
 							<th className="p-2 border">Nazwa</th>
 							<th className="p-2 border">Nr Faktury</th>
 							<th className="p-2 border">PLN</th>

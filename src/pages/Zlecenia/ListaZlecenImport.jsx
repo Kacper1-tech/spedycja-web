@@ -86,10 +86,10 @@ export default function ListaZlecenImport() {
           } else if (key === "delivery_date") {
             cell = formatDateRange(row.delivery_date_start, row.delivery_date_end);
 					} else if (key === "pickup_address") {
-						const parsed = JSON.parse(row.adresy_odbioru_json || "[]");
+						const parsed = safeParseArray(row.adresy_odbioru_json);
 						cell = Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
 					} else if (key === "delivery_address") {
-						const parsed = JSON.parse(row.adresy_dostawy_json || "[]");
+						const parsed = safeParseArray(row.adresy_dostawy_json);
 						cell = Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
           } else if (key === "identyfikator") {
             cell = row.zl_vat || row.zl_nip || row.zl_regon || row.zl_eori || row.zl_pesel || "-";
@@ -120,6 +120,15 @@ export default function ListaZlecenImport() {
 			setAllSelected(false);
 		}
 	};
+	
+	function safeParseArray(value) {
+		try {
+			const parsed = JSON.parse(value || "[]");
+			return Array.isArray(parsed) ? parsed : [];
+		} catch {
+			return [];
+		}
+	}
 
   return (
     <div>
@@ -198,14 +207,14 @@ export default function ListaZlecenImport() {
                 <td className="px-4 py-2 whitespace-nowrap">{row.delivery_time || (row.delivery_time_start && `${row.delivery_time_start} – ${row.delivery_time_end}`) || "-"}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
 									{(() => {
-										const parsed = JSON.parse(row.adresy_odbioru_json || "[]");
+										const parsed = safeParseArray(row.adresy_odbioru_json);
 										return Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
 									})()}
 								</td>
 
 								<td className="px-4 py-2 whitespace-nowrap">
 									{(() => {
-										const parsed = JSON.parse(row.adresy_dostawy_json || "[]");
+										const parsed = safeParseArray(row.adresy_dostawy_json);
 										return Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
 									})()}
 								</td>
@@ -258,7 +267,7 @@ export default function ListaZlecenImport() {
 								<p><strong>Godzina:</strong> {selectedZlecenie.pickup_time || `${selectedZlecenie.pickup_time_start || ""} – ${selectedZlecenie.pickup_time_end || ""}`}</p>
 								<p><strong>Adresy odbioru:</strong></p>
 								<ul className="list-disc pl-5">
-									{(p => Array.isArray(p) ? p : [])(JSON.parse(selectedZlecenie.adresy_odbioru_json || "[]")).map((a, i) => (
+									{safeParseArray(selectedZlecenie.adresy_odbioru_json).map((a, i) => (
 										<li key={i}>{a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}</li>
 									))}
 								</ul>
@@ -270,7 +279,7 @@ export default function ListaZlecenImport() {
 								<p><strong>Godzina:</strong> {selectedZlecenie.delivery_time || `${selectedZlecenie.delivery_time_start || ""} – ${selectedZlecenie.delivery_time_end || ""}`}</p>
 								<p><strong>Adresy dostawy:</strong></p>
 								<ul className="list-disc pl-5">
-									{(p => Array.isArray(p) ? p : [])(JSON.parse(selectedZlecenie.adresy_dostawy_json || "[]")).map((a, i) => (
+									{safeParseArray(selectedZlecenie.adresy_dostawy_json).map((a, i) => (
 										<li key={i}>{a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}</li>
 									))}
 								</ul>
@@ -289,14 +298,14 @@ export default function ListaZlecenImport() {
 								<p><strong>Odprawa celna exportowa:</strong> {selectedZlecenie.export_customs_option}</p>
 								<p><strong>Adres export:</strong></p>
 								<ul className="list-disc pl-5">
-									{(p => Array.isArray(p) ? p : [])(JSON.parse(selectedZlecenie.export_customs_adres_json || "[]")).map((a, i) => (
+									{safeParseArray(selectedZlecenie.export_customs_adres_json).map((a, i) => (
 										<li key={i}>{a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}</li>
 									))}
 								</ul>
 								<p><strong>Odprawa celna importowa:</strong> {selectedZlecenie.import_customs_option}</p>
 								<p><strong>Adres import:</strong></p>
 								<ul className="list-disc pl-5">
-									{(p => Array.isArray(p) ? p : [])(JSON.parse(selectedZlecenie.import_customs_adres_json || "[]")).map((a, i) => (
+									{safeParseArray(selectedZlecenie.import_customs_adres_json).map((a, i) => (
 										<li key={i}>{a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}</li>
 									))}
 								</ul>

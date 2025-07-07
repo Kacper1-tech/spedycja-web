@@ -119,7 +119,9 @@ export default function KontrahenciTab() {
               ? k.identyfikatory_json.vat || k.identyfikatory_json.nip || k.identyfikatory_json.regon || k.identyfikatory_json.eori || k.identyfikatory_json.pesel || "-"
               : "-";
 
-            const kontakt = k.kontakty_json?.imie_nazwisko || "-";
+            const kontakt = k.kontakty_json && k.kontakty_json.length > 0
+							? k.kontakty_json[0].imie_nazwisko || "-"
+							: "-";
 
             return (
               <tr key={k.id} onClick={() => handleShowDetails(k)} className="cursor-pointer hover:bg-gray-100">
@@ -134,29 +136,43 @@ export default function KontrahenciTab() {
         </tbody>
       </table>
 		{showModal && selectedKontrahent && (
-			<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-				<div className="bg-white p-6 rounded-lg max-w-xl w-full">
-					<h2 className="text-lg font-bold mb-4">Szczegóły kontrahenta</h2>
+			<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+				<div className="bg-white rounded-lg max-w-xl w-full flex flex-col max-h-[90vh]">
+					<div className="p-6 overflow-y-auto">
+						<h2 className="text-lg font-bold mb-4">Szczegóły kontrahenta</h2>
 
-					<div className="space-y-2 text-sm">
-						<p><strong>Grupa:</strong> {selectedKontrahent.grupa}</p>
-						<p><strong>Nazwa:</strong> {selectedKontrahent.nazwa}</p>
-						<p><strong>Adres:</strong> 
-							{selectedKontrahent.adres_json
-								? `${selectedKontrahent.adres_json.ulica_nr || ""}, ${selectedKontrahent.adres_json.kod_pocztowy || ""} ${selectedKontrahent.adres_json.miasto || ""}, ${selectedKontrahent.adres_json.panstwo || ""}`
-								: "-"}
-						</p>
-						<p><strong>VAT:</strong> {selectedKontrahent.identyfikatory_json?.vat || "-"}</p>
-						<p><strong>NIP:</strong> {selectedKontrahent.identyfikatory_json?.nip || "-"}</p>
-						<p><strong>REGON:</strong> {selectedKontrahent.identyfikatory_json?.regon || "-"}</p>
-						<p><strong>EORI:</strong> {selectedKontrahent.identyfikatory_json?.eori || "-"}</p>
-						<p><strong>PESEL:</strong> {selectedKontrahent.identyfikatory_json?.pesel || "-"}</p>
-						<p><strong>Osoba kontaktowa:</strong> {selectedKontrahent.kontakty_json?.imie_nazwisko || "-"}</p>
-						<p><strong>Telefon:</strong> {selectedKontrahent.kontakty_json?.telefon || "-"}</p>
-						<p><strong>Email:</strong> {selectedKontrahent.kontakty_json?.email || "-"}</p>
+						<div className="space-y-2 text-sm">
+							<p><strong>Grupa:</strong> {selectedKontrahent.grupa}</p>
+							<p><strong>Nazwa:</strong> {selectedKontrahent.nazwa}</p>
+							<p><strong>Adres:</strong> 
+								{selectedKontrahent.adres_json
+									? `${selectedKontrahent.adres_json.ulica_nr || ""}, ${selectedKontrahent.adres_json.kod_pocztowy || ""} ${selectedKontrahent.adres_json.miasto || ""}, ${selectedKontrahent.adres_json.panstwo || ""}`
+									: "-"}
+							</p>
+							<p><strong>VAT:</strong> {selectedKontrahent.identyfikatory_json?.vat || "-"}</p>
+							<p><strong>NIP:</strong> {selectedKontrahent.identyfikatory_json?.nip || "-"}</p>
+							<p><strong>REGON:</strong> {selectedKontrahent.identyfikatory_json?.regon || "-"}</p>
+							<p><strong>EORI:</strong> {selectedKontrahent.identyfikatory_json?.eori || "-"}</p>
+							<p><strong>PESEL:</strong> {selectedKontrahent.identyfikatory_json?.pesel || "-"}</p>
+
+							<h3 className="mt-4 font-bold">Osoby kontaktowe:</h3>
+							<div className="space-y-2">
+								{selectedKontrahent.kontakty_json && selectedKontrahent.kontakty_json.length > 0 ? (
+									selectedKontrahent.kontakty_json.map((kontakt, i) => (
+										<div key={i} className="p-2 border rounded">
+											<p><strong>Imię i nazwisko:</strong> {kontakt.imie_nazwisko || "-"}</p>
+											<p><strong>Telefon:</strong> {kontakt.telefon || "-"}</p>
+											<p><strong>Email:</strong> {kontakt.email || "-"}</p>
+										</div>
+									))
+								) : (
+									<p className="italic text-gray-500">Brak kontaktów</p>
+								)}
+							</div>
+						</div>
 					</div>
 
-					<div className="text-right mt-4">
+					<div className="p-4 border-t flex justify-end bg-white">
 						<button
 							onClick={() => setShowModal(false)}
 							className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"

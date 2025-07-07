@@ -53,6 +53,10 @@ export default function DodajZlecenieImport() {
 	const { id } = useParams();
 	const navigate = useNavigate();
 	const [kontrahenciSugestie, setKontrahenciSugestie] = useState([]);
+	const [exportCustomsSuggestions, setExportCustomsSuggestions] = useState([]);
+	const [importCustomsSuggestions, setImportCustomsSuggestions] = useState([]);
+	const [showPickupTimeRange, setShowPickupTimeRange] = useState(false);
+	const [showDeliveryTimeRange, setShowDeliveryTimeRange] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -124,6 +128,145 @@ export default function DodajZlecenieImport() {
 		if (isSubmitting) return;
 		setIsSubmitting(true);
 
+		let kontrahentIdNowy;
+
+		// 1️⃣ Najpierw sprawdzasz / tworzysz kontrahenta
+		let kontrahentQuery = supabase.from("kontrahenci").select("id, kontakty_json");
+
+		if (vat) {
+			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>vat", vat);
+		} else if (zlNip) {
+			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>nip", zlNip);
+		} else {
+			kontrahentQuery = kontrahentQuery.eq("nazwa", zlNazwa);
+		}
+
+		const { data: existingKontrahent } = await kontrahentQuery.maybeSingle();
+
+		if (!existingKontrahent) {
+			const kontrahentPayload = {
+				grupa: "Zleceniodawca",
+				nazwa: zlNazwa,
+				adres_json: {
+					ulica_nr: zlUlica,
+					miasto: zlMiasto,
+					kod_pocztowy: zlKodPocztowy,
+					panstwo: zlPanstwo
+				},
+				identyfikatory_json: {
+					vat: vat || null,
+					nip: zlNip || null,
+					regon: zlRegon || null,
+					eori: zlEori || null,
+					pesel: zlPesel || null
+				},
+				kontakty_json: [
+					{
+						imie_nazwisko: osobaKontaktowa || null,
+						email: emailKontaktowy || null,
+						telefon: telefonKontaktowy || null
+					}
+				]
+			};
+
+			const { data: insertedKontrahent, error: kontrahentError } = await supabase
+				.from("kontrahenci")
+				.insert([kontrahentPayload])
+				.select()
+				.single();
+
+			if (kontrahentError) {
+				console.error("Błąd zapisu kontrahenta:", kontrahentError.message);
+			} else {
+				kontrahentIdNowy = insertedKontrahent.id;
+			}
+		} else {
+				kontrahentIdNowy = existingKontrahent.id;
+
+				const oldContacts = existingKontrahent.kontakty_json || [];
+				const newContact = {
+					imie_nazwisko: osobaKontaktowa || null,
+					email: emailKontaktowy || null,
+					telefon: telefonKontaktowy || null
+				};
+
+				// ✅ DEDUPLIKACJA — sprawdź, czy już istnieje
+				const isDuplicate = oldContacts.some(
+					(c) =>
+						c.imie_nazwisko === newContact.imie_nazwisko &&
+						c.email === newContact.email &&
+						c.telefon === newContact.telefon
+				);
+
+				const updatedContacts = isDuplicate ? oldContacts : [...oldContacts, newContact];
+
+				const kontrahentPayload = {
+					nazwa: zlNazwa,
+					adres_json: {
+						ulica_nr: zlUlica,
+						miasto: zlMiasto,
+						kod_pocztowy: zlKodPocztowy,
+						panstwo: zlPanstwo
+					},
+					identyfikatory_json: {
+						vat: vat || null,
+						nip: zlNip || null,
+						regon: zlRegon || null,
+						eori: zlEori || null,
+						pesel: zlPesel || null
+					},
+					kontakty_json: updatedContacts
+				};
+
+				const { error: updateError } = await supabase
+					.from("kontrahenci")
+					.update(kontrahentPayload)
+					.eq("id", kontrahentIdNowy);
+
+				if (updateError) {
+					console.error("Błąd aktualizacji kontaktów:", updateError.message);
+				}
+			}
+			
+		// 👉 ZAPISZ AGENCJĘ CELNĄ (EKSPORTOWĄ)
+		if (exportCustomsOption === "adres" && exportCustomsAddress.nazwa) {
+			const { data: existingExportAgency } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.eq("nazwa", exportCustomsAddress.nazwa)
+				.single();
+
+			if (!existingExportAgency) {
+				await supabase.from("agencje_celne").insert({
+					nazwa: exportCustomsAddress.nazwa,
+					ulica: exportCustomsAddress.ulica,
+					miasto: exportCustomsAddress.miasto,
+					kod: exportCustomsAddress.kod,
+					panstwo: exportCustomsAddress.panstwo
+				});
+			}
+		}
+
+		// 👉 ZAPISZ AGENCJĘ CELNĄ (IMPORTOWĄ)
+		if (importCustomsOption === "adres" && importCustomsAddress.nazwa) {
+			const { data: existingImportAgency } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.eq("nazwa", importCustomsAddress.nazwa)
+				.single();
+
+			if (!existingImportAgency) {
+				await supabase.from("agencje_celne").insert({
+					nazwa: importCustomsAddress.nazwa,
+					ulica: importCustomsAddress.ulica,
+					miasto: importCustomsAddress.miasto,
+					kod: importCustomsAddress.kod,
+					panstwo: importCustomsAddress.panstwo
+				});
+			}
+		}
+
+		// 2️⃣ Dopiero teraz budujesz payload z kontrahent_id
 		const payload = {
 			numer_zlecenia: numerZlecenia,
 			osoba_kontaktowa: osobaKontaktowa,
@@ -160,14 +303,16 @@ export default function DodajZlecenieImport() {
 			ldm: ldm || null,
 			cena: cena || null,
 			uwagi: uwagi || null,
-			pickup_time: !showPickupRange ? pickupTime : null,
-			pickup_time_start: showPickupRange ? pickupTimeRange[0] : null,
-			pickup_time_end: showPickupRange ? pickupTimeRange[1] : null,
-			delivery_time: !showDeliveryRange ? deliveryTime : null,
-			delivery_time_start: showDeliveryRange ? deliveryTimeRange[0] : null,
-			delivery_time_end: showDeliveryRange ? deliveryTimeRange[1] : null,
+			pickup_time: !showPickupTimeRange ? pickupTime : null,
+			pickup_time_start: showPickupTimeRange ? pickupTimeRange[0] : null,
+			pickup_time_end: showPickupTimeRange ? pickupTimeRange[1] : null,
+			delivery_time: !showDeliveryTimeRange ? deliveryTime : null,
+			delivery_time_start: showDeliveryTimeRange ? deliveryTimeRange[0] : null,
+			delivery_time_end: showDeliveryTimeRange ? deliveryTimeRange[1] : null,
+			kontrahent_id: kontrahentIdNowy
 		};
 
+		// 3️⃣ INSERT lub UPDATE
 		let result;
 
 		if (id) {
@@ -184,91 +329,15 @@ export default function DodajZlecenieImport() {
 		const { error } = result;
 
 		if (error) {
-			console.error("Błąd zapisu do Supabase:", error);
-			alert("Wystąpił błąd podczas zapisu:\n" + error.message);
+			console.error("Błąd zapisu:", error.message);
+			alert("Błąd zapisu:\n" + error.message);
 			setIsSubmitting(false);
 			return;
 		}
 
-		// ✅ AUTOMATYCZNY ZAPIS KONTRAHENTA + DOPISZ OSOBĘ
-		let kontrahentQuery = supabase.from("kontrahenci").select("id");
-
-		if (vat) {
-			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>vat", vat);
-		} else if (zlNip) {
-			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>nip", zlNip);
-		} else {
-			kontrahentQuery = kontrahentQuery.eq("nazwa", zlNazwa);
-		}
-
-		const { data: existingKontrahent } = await kontrahentQuery.maybeSingle();
-
-		if (!existingKontrahent && zlNazwa) {
-			const kontrahentPayload = {
-				grupa: "Zleceniodawca",
-				nazwa: zlNazwa,
-				adres_json: {
-					ulica_nr: zlUlica,
-					miasto: zlMiasto,
-					kod_pocztowy: zlKodPocztowy,
-					panstwo: zlPanstwo
-				},
-				identyfikatory_json: {
-					vat: vat || null,
-					nip: zlNip || null,
-					regon: zlRegon || null,
-					eori: zlEori || null,
-					pesel: zlPesel || null
-				},
-				kontakty_json: [
-					{
-						imie_nazwisko: osobaKontaktowa || null,
-						email: emailKontaktowy || null,
-						telefon: telefonKontaktowy || null
-					}
-				]
-			};
-
-			const { error: kontrahentError } = await supabase
-				.from("kontrahenci")
-				.insert([kontrahentPayload]);
-
-			if (kontrahentError) {
-				console.error("Błąd zapisu kontrahenta:", kontrahentError.message);
-			}
-		} else if (existingKontrahent) {
-			// Istnieje — dopisz kontakt
-			const { data: kontrahentDetails } = await supabase
-				.from("kontrahenci")
-				.select("kontakty_json")
-				.eq("id", existingKontrahent.id)
-				.single();
-
-			const oldContacts = kontrahentDetails?.kontakty_json || [];
-
-			const newContact = {
-				imie_nazwisko: osobaKontaktowa || null,
-				email: emailKontaktowy || null,
-				telefon: telefonKontaktowy || null
-			};
-
-			const updatedContacts = [...oldContacts, newContact];
-
-			const { error: updateError } = await supabase
-				.from("kontrahenci")
-				.update({ kontakty_json: updatedContacts })
-				.eq("id", existingKontrahent.id);
-
-			if (updateError) {
-				console.error("Błąd aktualizacji kontaktów:", updateError.message);
-			}
-		}
-
-		alert(id ? "Zlecenie zostało zaktualizowane!" : "Zlecenie zostało zapisane!");
+		alert(id ? "Zlecenie zaktualizowane." : "Zlecenie zapisane.");
 		navigate("/zlecenia/import/lista");
-
 		if (!id) resetForm();
-
 		setIsSubmitting(false);
 	};
 
@@ -349,22 +418,78 @@ export default function DodajZlecenieImport() {
     }
   };
 	
-const handleZlNazwaChange = async (e) => {
-  const value = e.target.value;
-  setZlNazwa(value);
+	const handleExportCustomsNameChange = async (e) => {
+		const value = e.target.value;
+		setExportCustomsAddress({ ...exportCustomsAddress, nazwa: value });
 
-  if (value.length >= 2) {
-    const { data, error } = await supabase
-      .from("kontrahenci")
-      .select("*")
-      .ilike("nazwa", `${value}%`)
-      .limit(5);
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
 
-    if (!error) setKontrahenciSugestie(data);
-  } else {
-    setKontrahenciSugestie([]);
-  }
-};
+			if (!error) setExportCustomsSuggestions(data);
+		} else {
+			setExportCustomsSuggestions([]);
+		}
+	};
+
+	const handleExportCustomsSelect = (agency) => {
+		setExportCustomsAddress({
+			nazwa: agency.nazwa,
+			ulica: agency.ulica_nr,
+			miasto: agency.miasto,
+			kod: agency.kod_pocztowy,
+			panstwo: agency.panstwo
+		});
+		setExportCustomsSuggestions([]);
+	};
+	
+	const handleImportCustomsNameChange = async (e) => {
+		const value = e.target.value;
+		setImportCustomsAddress({ ...importCustomsAddress, nazwa: value });
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
+
+			if (!error) setImportCustomsSuggestions(data);
+		} else {
+			setImportCustomsSuggestions([]);
+		}
+	};
+
+	const handleImportCustomsSelect = (agency) => {
+		setImportCustomsAddress({
+			nazwa: agency.nazwa,
+			ulica: agency.ulica_nr,
+			miasto: agency.miasto,
+			kod: agency.kod_pocztowy,
+			panstwo: agency.panstwo
+		});
+		setImportCustomsSuggestions([]);
+	};
+	
+	const handleZlNazwaChange = async (e) => {
+		const value = e.target.value;
+		setZlNazwa(value);
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("kontrahenci")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
+
+			if (!error) setKontrahenciSugestie(data);
+		} else {
+			setKontrahenciSugestie([]);
+		}
+	};
 
 	const handleKontrahentSelect = (kontrahent) => {
 		setZlNazwa(kontrahent.nazwa);
@@ -573,36 +698,46 @@ const handleZlNazwaChange = async (e) => {
               />
               Przedział dat
             </label>
-						<div className="mt-2">
-						{!showPickupRange ? (
+						
+						<label className="text-sm flex items-center gap-2">
 							<input
-								type="time"
-								className="px-3 py-1 border rounded"
-								value={pickupTime}
-								onChange={(e) => setPickupTime(e.target.value)}
+								type="checkbox"
+								checked={showPickupTimeRange}
+								onChange={() => setShowPickupTimeRange(!showPickupTimeRange)}
 							/>
-						) : (
-							<div className="flex gap-2">
+							Przedział godzin
+						</label>
+						
+						<div className="mt-2">
+							{!showPickupTimeRange ? (
 								<input
 									type="time"
 									className="px-3 py-1 border rounded"
-									value={pickupTimeRange[0]}
-									onChange={(e) =>
-										setPickupTimeRange([e.target.value, pickupTimeRange[1]])
-									}
+									value={pickupTime}
+									onChange={(e) => setPickupTime(e.target.value)}
 								/>
-								<span className="self-center">–</span>
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={pickupTimeRange[1]}
-									onChange={(e) =>
-										setPickupTimeRange([pickupTimeRange[0], e.target.value])
-									}
-								/>
-							</div>
-						)}
-					</div>
+							) : (
+								<div className="flex gap-2">
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={pickupTimeRange[0]}
+										onChange={(e) =>
+											setPickupTimeRange([e.target.value, pickupTimeRange[1]])
+										}
+									/>
+									<span className="self-center">–</span>
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={pickupTimeRange[1]}
+										onChange={(e) =>
+											setPickupTimeRange([pickupTimeRange[0], e.target.value])
+										}
+									/>
+								</div>
+							)}
+						</div>
           </div>
         </div>
 
@@ -636,36 +771,46 @@ const handleZlNazwaChange = async (e) => {
               />
               Przedział dat
             </label>
-						<div className="mt-2">
-						{!showDeliveryRange ? (
+						
+						<label className="text-sm flex items-center gap-2">
 							<input
-								type="time"
-								className="px-3 py-1 border rounded"
-								value={deliveryTime}
-								onChange={(e) => setDeliveryTime(e.target.value)}
+								type="checkbox"
+								checked={showDeliveryTimeRange}
+								onChange={() => setShowDeliveryTimeRange(!showDeliveryTimeRange)}
 							/>
-						) : (
-							<div className="flex gap-2">
+							Przedział godzin
+						</label>
+						
+						<div className="mt-2">
+							{!showDeliveryTimeRange ? (
 								<input
 									type="time"
 									className="px-3 py-1 border rounded"
-									value={deliveryTimeRange[0]}
-									onChange={(e) =>
-										setDeliveryTimeRange([e.target.value, deliveryTimeRange[1]])
-									}
+									value={deliveryTime}
+									onChange={(e) => setDeliveryTime(e.target.value)}
 								/>
-								<span className="self-center">–</span>
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={deliveryTimeRange[1]}
-									onChange={(e) =>
-										setDeliveryTimeRange([deliveryTimeRange[0], e.target.value])
-									}
-								/>
-							</div>
-						)}
-					</div>
+							) : (
+								<div className="flex gap-2">
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={deliveryTimeRange[0]}
+										onChange={(e) =>
+											setDeliveryTimeRange([e.target.value, deliveryTimeRange[1]])
+										}
+									/>
+									<span className="self-center">–</span>
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={deliveryTimeRange[1]}
+										onChange={(e) =>
+											setDeliveryTimeRange([deliveryTimeRange[0], e.target.value])
+										}
+									/>
+								</div>
+							)}
+						</div>
           </div>
         </div>
       </div>
@@ -909,13 +1054,28 @@ const handleZlNazwaChange = async (e) => {
 
 		  {exportCustomsOption === "adres" && (
 			<div className="w-full space-y-2 border-t pt-2">
-			  <input
-					type="text"
-					placeholder="Nazwa firmy"
-					className="w-full px-3 py-1 border rounded"
-					value={exportCustomsAddress.nazwa || ""}
-					onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, nazwa: e.target.value })}
-				/>
+			  <div className="relative">
+					<input
+						type="text"
+						placeholder="Nazwa firmy"
+						className="w-full px-3 py-1 border rounded"
+						value={exportCustomsAddress.nazwa || ""}
+						onChange={handleExportCustomsNameChange}
+					/>
+					{exportCustomsSuggestions.length > 0 && (
+						<ul className="absolute z-50 bg-white border w-full">
+							{exportCustomsSuggestions.map((agency) => (
+								<li
+									key={agency.id}
+									className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+									onClick={() => handleExportCustomsSelect(agency)}
+								>
+									{agency.nazwa}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
 			  <input
 					type="text"
 					placeholder="Ulica i nr budynku"
@@ -992,6 +1152,22 @@ const handleZlNazwaChange = async (e) => {
 
 		  {importCustomsOption === "adres" && (
 			<div className="w-full space-y-2 border-t pt-2">
+				<input
+					type="text"
+					placeholder="Nazwa firmy"
+					className="w-full px-3 py-1 border rounded"
+					value={importCustomsAddress.nazwa || ""}
+					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, nazwa: e.target.value })}
+				/>
+
+				<input
+					type="text"
+					placeholder="Ulica i nr budynku"
+					className="w-full px-3 py-1 border rounded"
+					value={importCustomsAddress.ulica || ""}
+					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, ulica: e.target.value })}
+				/>
+			
 			  <input
 					type="text"
 					placeholder="Miejscowość"

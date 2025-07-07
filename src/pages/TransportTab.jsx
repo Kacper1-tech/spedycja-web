@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import React from "react";
+import { getCurrencySymbol } from "../utils/currency";
 
 export default function TransportTab() {
   const [planRows, setPlanRows] = useState([]); // lewa tabela
@@ -105,15 +106,22 @@ export default function TransportTab() {
 		setSelectedRow(null);
 	};
 
-  const handleAddSeparator = async () => {
-		const max = planRows.reduce((acc, r) => Math.max(acc, r.kolejnosc || 0), 0);
+	const handleAddSeparator = async () => {
+		// Zwiększ kolejnosc wszystkim istniejącym wierszom o 1
+		for (let row of planRows) {
+			await supabase
+				.from("transport_plan")
+				.update({ kolejnosc: (row.kolejnosc || 0) + 1 })
+				.eq("id", row.id);
+		}
 
+		// Dodaj nowy separator na górę z kolejnosc = 0
 		await supabase.from("transport_plan").insert({
 			kierowca: `--- ${dateSeparator} ---`,
 			export: [],
 			import: [],
 			uwagi: "",
-			kolejnosc: max + 1
+			kolejnosc: 0
 		});
 
 		fetchPlan();
@@ -604,6 +612,12 @@ export default function TransportTab() {
 										</tr>
 									) : (
 										<tr
+											draggable
+											onDragStart={(e) => {
+												console.log("✅ DRAG START:", row.id);
+												e.dataTransfer.effectAllowed = "move";
+												setDraggedRowId(row.id);
+											}}
 											className={`cursor-pointer ${selectedRow?.id === row.id ? "bg-blue-100" : ""}`}
 											onClick={() => {
 												setSelectedRow(row);
@@ -774,7 +788,9 @@ export default function TransportTab() {
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
 								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">{o.cena}</td>
+								<td className="border p-2">
+									{o.cena} {getCurrencySymbol(o.waluta)}
+								</td>
 								<td className="border p-2">
 									<button
 										onClick={() => handleHideOrder(o)}
@@ -807,7 +823,9 @@ export default function TransportTab() {
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
 								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">{o.cena}</td>
+								<td className="border p-2">
+									{o.cena} {getCurrencySymbol(o.waluta)}
+								</td>
 								<td className="border p-2">
 									<button
 										onClick={() => handleHideOrder(o)}
@@ -841,7 +859,9 @@ export default function TransportTab() {
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
 								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">{o.cena}</td>
+								<td className="border p-2">
+									{o.cena} {getCurrencySymbol(o.waluta)}
+								</td>
 								<td className="border p-2">
 									<button
 										onClick={() => handleHideOrder(o)}

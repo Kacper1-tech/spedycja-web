@@ -54,6 +54,14 @@ export default function DodajZlecenieExport() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const navigate = useNavigate();
 	const [kontrahenciSugestie, setKontrahenciSugestie] = useState([]);
+	const [kontrahentId, setKontrahentId] = useState(null);
+	const [exportCustomsSuggestions, setExportCustomsSuggestions] = useState([]);
+	const [importCustomsSuggestions, setImportCustomsSuggestions] = useState([]);
+	const [pickupDateIsRange, setPickupDateIsRange] = useState(false);
+	const [pickupTimeIsRange, setPickupTimeIsRange] = useState(false);
+	const [deliveryDateIsRange, setDeliveryDateIsRange] = useState(false);
+	const [deliveryTimeIsRange, setDeliveryTimeIsRange] = useState(false);
+
 	
 		// ⬇️ TUTAJ WKLEJ
 	useEffect(() => {
@@ -116,6 +124,8 @@ export default function DodajZlecenieExport() {
 
 			setPickupAddresses(JSON.parse(data.adresy_odbioru_json || "[]"));
 			setDeliveryAddresses(JSON.parse(data.adresy_dostawy_json || "[]"));
+			
+			setKontrahentId(data.kontrahent_id || null);
 
 			setPalety(data.palety || "");
 			setWaga(data.waga || "");
@@ -132,6 +142,146 @@ export default function DodajZlecenieExport() {
 		if (isSubmitting) return;
 		setIsSubmitting(true);
 
+		let kontrahentIdNowy;
+
+		// 🔑 1️⃣ Najpierw znajdź lub stwórz kontrahenta
+		let kontrahentQuery = supabase.from("kontrahenci").select("id, kontakty_json");
+
+		if (vat) {
+			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>vat", vat);
+		} else if (zlNip) {
+			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>nip", zlNip);
+		} else {
+			kontrahentQuery = kontrahentQuery.eq("nazwa", zlNazwa);
+		}
+
+		const { data: existingKontrahent } = await kontrahentQuery.maybeSingle();
+
+		if (!existingKontrahent) {
+			// NOWY kontrahent
+			const kontrahentPayload = {
+				grupa: "Zleceniodawca",
+				nazwa: zlNazwa,
+				adres_json: {
+					ulica_nr: zlUlica,
+					miasto: zlMiasto,
+					kod_pocztowy: zlKodPocztowy,
+					panstwo: zlPanstwo
+				},
+				identyfikatory_json: {
+					vat: vat || null,
+					nip: zlNip || null,
+					regon: zlRegon || null,
+					eori: zlEori || null,
+					pesel: zlPesel || null
+				},
+				kontakty_json: [
+					{
+						imie_nazwisko: osobaKontaktowa || null,
+						email: emailKontaktowy || null,
+						telefon: telefonKontaktowy || null
+					}
+				]
+			};
+
+			const { data: insertedKontrahent, error: kontrahentError } = await supabase
+				.from("kontrahenci")
+				.insert([kontrahentPayload])
+				.select()
+				.single();
+
+			if (kontrahentError) {
+				console.error("Błąd zapisu kontrahenta:", kontrahentError.message);
+			} else {
+				kontrahentIdNowy = insertedKontrahent.id;
+			}
+		} else {
+				kontrahentIdNowy = existingKontrahent.id;
+
+				const oldContacts = existingKontrahent.kontakty_json || [];
+				const newContact = {
+					imie_nazwisko: osobaKontaktowa || null,
+					email: emailKontaktowy || null,
+					telefon: telefonKontaktowy || null
+				};
+
+				// ✅ DEDUPLIKACJA — sprawdź, czy taki kontakt już istnieje
+				const isDuplicate = oldContacts.some(
+					(c) =>
+						c.imie_nazwisko === newContact.imie_nazwisko &&
+						c.email === newContact.email &&
+						c.telefon === newContact.telefon
+				);
+
+				const updatedContacts = isDuplicate ? oldContacts : [...oldContacts, newContact];
+
+				const kontrahentPayload = {
+					nazwa: zlNazwa,
+					adres_json: {
+						ulica_nr: zlUlica,
+						miasto: zlMiasto,
+						kod_pocztowy: zlKodPocztowy,
+						panstwo: zlPanstwo
+					},
+					identyfikatory_json: {
+						vat: vat || null,
+						nip: zlNip || null,
+						regon: zlRegon || null,
+						eori: zlEori || null,
+						pesel: zlPesel || null
+					},
+					kontakty_json: updatedContacts
+				};
+
+				const { error: updateError } = await supabase
+					.from("kontrahenci")
+					.update(kontrahentPayload)
+					.eq("id", existingKontrahent.id);
+
+				if (updateError) {
+					console.error("Błąd aktualizacji kontrahenta:", updateError.message);
+				}
+			}
+
+		// 👉 ZAPISZ AGENCJĘ CELNĄ (EKSPORTOWĄ)
+		if (exportCustomsOption === "adres" && exportCustomsAddress.nazwa) {
+			const { data: existingExportAgency } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.eq("nazwa", exportCustomsAddress.nazwa)
+				.single();
+
+			if (!existingExportAgency) {
+				await supabase.from("agencje_celne").insert({
+					nazwa: exportCustomsAddress.nazwa,
+					ulica: exportCustomsAddress.ulica,
+					miasto: exportCustomsAddress.miasto,
+					kod: exportCustomsAddress.kod,
+					panstwo: exportCustomsAddress.panstwo
+				});
+			}
+		}
+
+		// 👉 ZAPISZ AGENCJĘ CELNĄ (IMPORTOWĄ)
+		if (importCustomsOption === "adres" && importCustomsAddress.nazwa) {
+			const { data: existingImportAgency } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.eq("nazwa", importCustomsAddress.nazwa)
+				.single();
+
+			if (!existingImportAgency) {
+				await supabase.from("agencje_celne").insert({
+					nazwa: importCustomsAddress.nazwa,
+					ulica: importCustomsAddress.ulica,
+					miasto: importCustomsAddress.miasto,
+					kod: importCustomsAddress.kod,
+					panstwo: importCustomsAddress.panstwo
+				});
+			}
+		}
+
+		// 🔑 2️⃣ Dopiero teraz budujesz payload — z kontrahent_id
 		const payload = {
 			numer_zlecenia: numerZlecenia,
 			osoba_kontaktowa: osobaKontaktowa,
@@ -168,108 +318,40 @@ export default function DodajZlecenieExport() {
 			ldm: ldm || null,
 			cena: cena || null,
 			uwagi: uwagi || null,
-			pickup_time: !showPickupRange ? pickupTime : null,
-			pickup_time_start: showPickupRange ? pickupTimeRange[0] : null,
-			pickup_time_end: showPickupRange ? pickupTimeRange[1] : null,
-			delivery_time: !showDeliveryRange ? deliveryTime : null,
-			delivery_time_start: showDeliveryRange ? deliveryTimeRange[0] : null,
-			delivery_time_end: showDeliveryRange ? deliveryTimeRange[1] : null,
+			pickup_time: !pickupTimeIsRange ? pickupTime : null,
+			pickup_time_start: pickupTimeIsRange ? pickupTimeRange[0] : null,
+			pickup_time_end: pickupTimeIsRange ? pickupTimeRange[1] : null,
+
+			delivery_time: !deliveryTimeIsRange ? deliveryTime : null,
+			delivery_time_start: deliveryTimeIsRange ? deliveryTimeRange[0] : null,
+			delivery_time_end: deliveryTimeIsRange ? deliveryTimeRange[1] : null,
+			kontrahent_id: kontrahentIdNowy // 💥 TO JEST KLUCZ
 		};
 
-		let error;
-
+		// 🔑 3️⃣ INSERT lub UPDATE
 		if (id) {
-			// Edycja
-			({ error } = await supabase
+			const { error: updateError } = await supabase
 				.from("zlecenia_export")
 				.update(payload)
-				.eq("id", id));
-		} else {
-			// Nowe zlecenie
-			({ error } = await supabase
-				.from("zlecenia_export")
-				.insert([payload]));
-		}
-
-		if (error) {
-			console.error("Błąd zapisu:", error.message);
-			alert("Wystąpił błąd:\n" + error.message);
-			setIsSubmitting(false);
-			return;
-		}
-
-		// ✅ AUTOMATYCZNY ZAPIS KONTRAHENTA + DOPISZ OSOBĘ
-		let kontrahentQuery = supabase.from("kontrahenci").select("id");
-
-		if (vat) {
-			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>vat", vat);
-		} else if (zlNip) {
-			kontrahentQuery = kontrahentQuery.eq("identyfikatory_json->>nip", zlNip);
-		} else {
-			kontrahentQuery = kontrahentQuery.eq("nazwa", zlNazwa);
-		}
-
-		const { data: existingKontrahent } = await kontrahentQuery.maybeSingle();
-
-		if (!existingKontrahent) {
-			// Nowy kontrahent — z tablicą kontaktów
-			const kontrahentPayload = {
-				grupa: "Zleceniodawca",
-				nazwa: zlNazwa,
-				adres_json: {
-					ulica_nr: zlUlica,
-					miasto: zlMiasto,
-					kod_pocztowy: zlKodPocztowy,
-					panstwo: zlPanstwo
-				},
-				identyfikatory_json: {
-					vat: vat || null,
-					nip: zlNip || null,
-					regon: zlRegon || null,
-					eori: zlEori || null,
-					pesel: zlPesel || null
-				},
-				kontakty_json: [
-					{
-						imie_nazwisko: osobaKontaktowa || null,
-						email: emailKontaktowy || null,
-						telefon: telefonKontaktowy || null
-					}
-				]
-			};
-
-			const { error: kontrahentError } = await supabase
-				.from("kontrahenci")
-				.insert([kontrahentPayload]);
-
-			if (kontrahentError) {
-				console.error("Błąd zapisu kontrahenta:", kontrahentError.message);
-			}
-		} else {
-			// Istnieje — dopisz kontakt
-			const { data: kontrahentDetails } = await supabase
-				.from("kontrahenci")
-				.select("kontakty_json")
-				.eq("id", existingKontrahent.id)
-				.single();
-
-			const oldContacts = kontrahentDetails?.kontakty_json || [];
-
-			const newContact = {
-				imie_nazwisko: osobaKontaktowa || null,
-				email: emailKontaktowy || null,
-				telefon: telefonKontaktowy || null
-			};
-
-			const updatedContacts = [...oldContacts, newContact];
-
-			const { error: updateError } = await supabase
-				.from("kontrahenci")
-				.update({ kontakty_json: updatedContacts })
-				.eq("id", existingKontrahent.id);
+				.eq("id", id);
 
 			if (updateError) {
-				console.error("Błąd aktualizacji kontaktów:", updateError.message);
+				console.error("Błąd zapisu:", updateError.message);
+				alert("Wystąpił błąd:\n" + updateError.message);
+				setIsSubmitting(false);
+				return;
+			}
+
+		} else {
+			const { error: insertError } = await supabase
+				.from("zlecenia_export")
+				.insert([payload]);
+
+			if (insertError) {
+				console.error("Błąd zapisu:", insertError.message);
+				alert("Wystąpił błąd:\n" + insertError.message);
+				setIsSubmitting(false);
+				return;
 			}
 		}
 
@@ -355,22 +437,78 @@ export default function DodajZlecenieExport() {
     }
   };
 	
-const handleZlNazwaChange = async (e) => {
-  const value = e.target.value;
-  setZlNazwa(value);
+	const handleExportCustomsNameChange = async (e) => {
+		const value = e.target.value;
+		setExportCustomsAddress({ ...exportCustomsAddress, nazwa: value });
 
-  if (value.length >= 2) {
-    const { data, error } = await supabase
-      .from("kontrahenci")
-      .select("*")
-      .ilike("nazwa", `${value}%`)
-      .limit(5);
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
 
-    if (!error) setKontrahenciSugestie(data);
-  } else {
-    setKontrahenciSugestie([]);
-  }
-};
+			if (!error) setExportCustomsSuggestions(data);
+		} else {
+			setExportCustomsSuggestions([]);
+		}
+	};
+
+	const handleExportCustomsSelect = (agency) => {
+		setExportCustomsAddress({
+			nazwa: agency.nazwa,
+			ulica: agency.ulica_nr,
+			miasto: agency.miasto,
+			kod: agency.kod_pocztowy,
+			panstwo: agency.panstwo
+		});
+		setExportCustomsSuggestions([]);
+	};
+	
+	const handleImportCustomsNameChange = async (e) => {
+		const value = e.target.value;
+		setImportCustomsAddress({ ...importCustomsAddress, nazwa: value });
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("agencje_celne")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
+
+			if (!error) setImportCustomsSuggestions(data);
+		} else {
+			setImportCustomsSuggestions([]);
+		}
+	};
+
+	const handleImportCustomsSelect = (agency) => {
+		setImportCustomsAddress({
+			nazwa: agency.nazwa,
+			ulica: agency.ulica_nr,
+			miasto: agency.miasto,
+			kod: agency.kod_pocztowy,
+			panstwo: agency.panstwo
+		});
+		setImportCustomsSuggestions([]);
+	};
+	
+	const handleZlNazwaChange = async (e) => {
+		const value = e.target.value;
+		setZlNazwa(value);
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("kontrahenci")
+				.select("*")
+				.ilike("nazwa", `${value}%`)
+				.limit(5);
+
+			if (!error) setKontrahenciSugestie(data);
+		} else {
+			setKontrahenciSugestie([]);
+		}
+	};
 
 	const handleKontrahentSelect = (kontrahent) => {
 		setZlNazwa(kontrahent.nazwa);
@@ -392,746 +530,779 @@ const handleZlNazwaChange = async (e) => {
 		setEmailKontaktowy(kontrahent.kontakt_json?.email || "");
 	};
 
-  return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-center">Dodaj zlecenie eksportowe</h1>
+	return (
+		<div className="max-w-6xl mx-auto p-6 space-y-6">
+				<h1 className="text-2xl font-bold text-center">
+					Dodaj zlecenie eksportowe
+				</h1>
 
-	<div className="flex gap-8 mt-6 items-center justify-center">
-	  {/* Numer zlecenia */}
-	  <div className="flex-1 flex flex-col items-center">
-		<label className="mb-2 font-medium text-center">Numer zlecenia transportowego</label>
-		<input
-			type="text"
-			className="w-full px-3 py-1 border rounded"
-			value={numerZlecenia}
-			onChange={(e) => setNumerZlecenia(e.target.value)}
-		/>
-	  </div>
-
-		{/* Osoba kontaktowa */}
-		<div className="flex-1 flex flex-col items-center">
-			<label className="mb-2 font-medium text-center">Osoba kontaktowa zleceniodawcy</label>
-			<div className="w-full space-y-2">
-				<input
-					type="text"
-					placeholder="Imię i nazwisko"
-					className="w-full px-3 py-1 border rounded"
-					value={osobaKontaktowa}
-					onChange={(e) => setOsobaKontaktowa(e.target.value)}
-				/>
-				<div className="flex gap-4">
-					<input
-						type="tel"
-						placeholder="Telefon"
-						className="w-1/2 px-3 py-1 border rounded"
-						value={telefonKontaktowy}
-						onChange={(e) => setTelefonKontaktowy(e.target.value)}
-					/>
-					<input
-						type="email"
-						placeholder="E-mail"
-						className="w-1/2 px-3 py-1 border rounded"
-						value={emailKontaktowy}
-						onChange={(e) => setEmailKontaktowy(e.target.value)}
-					/>
-				</div>
+		<div className="flex gap-8 mt-6 items-center justify-center">
+			{/* Numer zlecenia */}
+			<div className="flex-1 flex flex-col items-center">
+			<label className="mb-2 font-medium text-center">Numer zlecenia transportowego</label>
+			<input
+				type="text"
+				className="w-full px-3 py-1 border rounded"
+				value={numerZlecenia}
+				onChange={(e) => setNumerZlecenia(e.target.value)}
+			/>
 			</div>
-		</div>
-	 </div>
 
-		{/* Zleceniodawca */}
-		<div className="border-t border-b py-4">
-			<h2 className="text-center font-bold mb-4">ZLECENIODAWCA</h2>
-			<div className="space-y-2">
-				<div className="relative">
+			{/* Osoba kontaktowa */}
+			<div className="flex-1 flex flex-col items-center">
+				<label className="mb-2 font-medium text-center">Osoba kontaktowa zleceniodawcy</label>
+				<div className="w-full space-y-2">
 					<input
 						type="text"
-						placeholder="Nazwa"
+						placeholder="Imię i nazwisko"
 						className="w-full px-3 py-1 border rounded"
-						value={zlNazwa}
-						onChange={handleZlNazwaChange}
+						value={osobaKontaktowa}
+						onChange={(e) => setOsobaKontaktowa(e.target.value)}
 					/>
-
-					{kontrahenciSugestie.length > 0 && (
-						<ul className="absolute z-50 bg-white border w-full">
-							{kontrahenciSugestie.map((k) => (
-								<li
-									key={k.id}
-									className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
-									onClick={() => handleKontrahentSelect(k)}
-								>
-									{k.nazwa}
-								</li>
-							))}
-						</ul>
-					)}
+					<div className="flex gap-4">
+						<input
+							type="tel"
+							placeholder="Telefon"
+							className="w-1/2 px-3 py-1 border rounded"
+							value={telefonKontaktowy}
+							onChange={(e) => setTelefonKontaktowy(e.target.value)}
+						/>
+						<input
+							type="email"
+							placeholder="E-mail"
+							className="w-1/2 px-3 py-1 border rounded"
+							value={emailKontaktowy}
+							onChange={(e) => setEmailKontaktowy(e.target.value)}
+						/>
+					</div>
 				</div>
-				<input
-					type="text"
-					placeholder="Ulica i nr budynku"
-					className="w-full px-3 py-1 border rounded"
-					value={zlUlica}
-					onChange={(e) => setZlUlica(e.target.value)}
-				/>
-				<input
-					type="text"
-					placeholder="Miejscowość"
-					className="w-full px-3 py-1 border rounded"
-					value={zlMiasto}
-					onChange={(e) => setZlMiasto(e.target.value)}
-				/>
-				<input
-					type="text"
-					placeholder="Kod pocztowy"
-					className="w-full px-3 py-1 border rounded"
-					value={zlKodPocztowy}
-					onChange={(e) => setZlKodPocztowy(e.target.value)}
-				/>
-				<input
-					type="text"
-					placeholder="Państwo"
-					className="w-full px-3 py-1 border rounded"
-					value={zlPanstwo}
-					onChange={(e) => setZlPanstwo(e.target.value)}
-				/>
-
-				{!showOtherIds ? (
-					<>
-						<input
-							type="text"
-							placeholder="VAT"
-							value={vat}
-							onChange={(e) => setVat(e.target.value)}
-							className="w-full px-3 py-1 border rounded"
-						/>
-						<button
-							type="button"
-							onClick={() => setShowOtherIds(true)}
-							className="text-blue-600 underline text-sm"
-						>
-							Nie masz VAT? Dodaj inny numer
-						</button>
-					</>
-				) : (
-					<div className="space-y-2">
-						<input
-							type="text"
-							placeholder="NIP"
-							className="w-full px-3 py-1 border rounded"
-							value={zlNip}
-							onChange={(e) => setZlNip(e.target.value)}
-						/>
-						<input
-							type="text"
-							placeholder="REGON"
-							className="w-full px-3 py-1 border rounded"
-							value={zlRegon}
-							onChange={(e) => setZlRegon(e.target.value)}
-						/>
-						<input
-							type="text"
-							placeholder="EORI"
-							className="w-full px-3 py-1 border rounded"
-							value={zlEori}
-							onChange={(e) => setZlEori(e.target.value)}
-						/>
-						<input
-							type="text"
-							placeholder="PESEL"
-							className="w-full px-3 py-1 border rounded"
-							value={zlPesel}
-							onChange={(e) => setZlPesel(e.target.value)}
-						/>
-					</div>
-				)}
 			</div>
-		</div>
+		 </div>
 
-      {/* Daty */}
-      <div className="flex gap-8">
-        <div className="flex-1">
-          <h2 className="font-semibold mb-2 text-center">Data załadunku</h2>
-          <div className="flex flex-col items-center">
-            <div className="mb-2">
-              {!showPickupRange ? (
-                <DatePicker
-                  selected={pickupDate}
-                  onChange={(date) => setPickupDate(date)}
-                  dateFormat="dd/MM/yyyy"
-                  inline
-                />
-              ) : (
-                <DatePicker
-                  selectsRange
-                  startDate={pickupRange[0]}
-                  endDate={pickupRange[1]}
-                  onChange={(update) => setPickupRange(update)}
-                  dateFormat="dd/MM/yyyy"
-                  inline
-                />
-              )}
-            </div>
-            <label className="text-sm flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showPickupRange}
-                onChange={() => setShowPickupRange(!showPickupRange)}
-              />
-              Przedział dat
-            </label>
-						<div className="mt-2">
-						{!showPickupRange ? (
-							<input
-								type="time"
-								className="px-3 py-1 border rounded"
-								value={pickupTime}
-								onChange={(e) => setPickupTime(e.target.value)}
-							/>
-						) : (
-							<div className="flex gap-2">
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={pickupTimeRange[0]}
-									onChange={(e) =>
-										setPickupTimeRange([e.target.value, pickupTimeRange[1]])
-									}
-								/>
-								<span className="self-center">–</span>
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={pickupTimeRange[1]}
-									onChange={(e) =>
-										setPickupTimeRange([pickupTimeRange[0], e.target.value])
-									}
-								/>
-							</div>
+			{/* Zleceniodawca */}
+			<div className="border-t border-b py-4">
+				<h2 className="text-center font-bold mb-4">ZLECENIODAWCA</h2>
+				<div className="space-y-2">
+					<div className="relative">
+						<input
+							type="text"
+							placeholder="Nazwa"
+							className="w-full px-3 py-1 border rounded"
+							value={zlNazwa}
+							onChange={handleZlNazwaChange}
+						/>
+
+						{kontrahenciSugestie.length > 0 && (
+							<ul className="absolute z-50 bg-white border w-full">
+								{kontrahenciSugestie.map((k) => (
+									<li
+										key={k.id}
+										className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+										onClick={() => handleKontrahentSelect(k)}
+									>
+										{k.nazwa}
+									</li>
+								))}
+							</ul>
 						)}
 					</div>
-          </div>
-        </div>
-
-        <div className="flex-1">
-          <h2 className="font-semibold mb-2 text-center">Data rozładunku</h2>
-          <div className="flex flex-col items-center">
-            <div className="mb-2">
-              {!showDeliveryRange ? (
-                <DatePicker
-                  selected={deliveryDate}
-                  onChange={(date) => setDeliveryDate(date)}
-                  dateFormat="dd/MM/yyyy"
-                  inline
-                />
-              ) : (
-                <DatePicker
-                  selectsRange
-                  startDate={deliveryRange[0]}
-                  endDate={deliveryRange[1]}
-                  onChange={(update) => setDeliveryRange(update)}
-                  dateFormat="dd/MM/yyyy"
-                  inline
-                />
-              )}
-            </div>
-            <label className="text-sm flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showDeliveryRange}
-                onChange={() => setShowDeliveryRange(!showDeliveryRange)}
-              />
-              Przedział dat
-            </label>
-						<div className="mt-2">
-						{!showDeliveryRange ? (
-							<input
-								type="time"
-								className="px-3 py-1 border rounded"
-								value={deliveryTime}
-								onChange={(e) => setDeliveryTime(e.target.value)}
-							/>
-						) : (
-							<div className="flex gap-2">
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={deliveryTimeRange[0]}
-									onChange={(e) =>
-										setDeliveryTimeRange([e.target.value, deliveryTimeRange[1]])
-									}
-								/>
-								<span className="self-center">–</span>
-								<input
-									type="time"
-									className="px-3 py-1 border rounded"
-									value={deliveryTimeRange[1]}
-									onChange={(e) =>
-										setDeliveryTimeRange([deliveryTimeRange[0], e.target.value])
-									}
-								/>
-							</div>
-						)}
-					</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Adresy odbioru i dostawy */}
-      <div className="flex gap-8">
-        <div className="flex-1">
-          <h2 className="font-semibold text-center mb-2">Adres odbioru towaru</h2>
-          <div className="space-y-4">
-            {pickupAddresses.map((address, index) => (
-							<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
-								<input
-									type="text"
-									placeholder="Nazwa firmy"
-									className="w-full px-3 py-1 border rounded"
-									value={address.nazwa || ""}
-									onChange={(e) => {
-										const updated = [...pickupAddresses];
-										updated[index] = { ...updated[index], nazwa: e.target.value };
-										setPickupAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Ulica i nr budynku"
-									className="w-full px-3 py-1 border rounded"
-									value={address.ulica || ""}
-									onChange={(e) => {
-										const updated = [...pickupAddresses];
-										updated[index] = { ...updated[index], ulica: e.target.value };
-										setPickupAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Miejscowość"
-									className="w-full px-3 py-1 border rounded"
-									value={address.miasto || ""}
-									onChange={(e) => {
-										const updated = [...pickupAddresses];
-										updated[index] = { ...updated[index], miasto: e.target.value };
-										setPickupAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Kod pocztowy"
-									className="w-full px-3 py-1 border rounded"
-									value={address.kod || ""}
-									onChange={(e) => {
-										const updated = [...pickupAddresses];
-										updated[index] = { ...updated[index], kod: e.target.value };
-										setPickupAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Państwo"
-									className="w-full px-3 py-1 border rounded"
-									value={address.panstwo || ""}
-									onChange={(e) => {
-										const updated = [...pickupAddresses];
-										updated[index] = { ...updated[index], panstwo: e.target.value };
-										setPickupAddresses(updated);
-									}}
-								/>
-							</div>
-						))}
-
-            <div className="flex gap-4 justify-center">
-			  <button type="button" onClick={addPickupAddress} className="text-blue-600 underline text-sm">
-				Dodaj kolejne miejsce
-			  </button>
-			  {pickupAddresses.length > 1 && (
-				<button type="button" onClick={removeLastPickupAddress} className="text-red-600 underline text-sm">
-				  Cofnij ostatnie
-				</button>
-			  )}
-			</div>
-          </div>
-        </div>
-
-        <div className="flex-1">
-          <h2 className="font-semibold text-center mb-2">Adres dostawy towaru</h2>
-          <div className="space-y-4">
-            {deliveryAddresses.map((address, index) => (
-							<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
-								<input
-									type="text"
-									placeholder="Nazwa firmy"
-									className="w-full px-3 py-1 border rounded"
-									value={address.nazwa || ""}
-									onChange={(e) => {
-										const updated = [...deliveryAddresses];
-										updated[index] = { ...updated[index], nazwa: e.target.value };
-										setDeliveryAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Ulica i nr budynku"
-									className="w-full px-3 py-1 border rounded"
-									value={address.ulica || ""}
-									onChange={(e) => {
-										const updated = [...deliveryAddresses];
-										updated[index] = { ...updated[index], ulica: e.target.value };
-										setDeliveryAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Miejscowość"
-									className="w-full px-3 py-1 border rounded"
-									value={address.miasto || ""}
-									onChange={(e) => {
-										const updated = [...deliveryAddresses];
-										updated[index] = { ...updated[index], miasto: e.target.value };
-										setDeliveryAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Kod pocztowy"
-									className="w-full px-3 py-1 border rounded"
-									value={address.kod || ""}
-									onChange={(e) => {
-										const updated = [...deliveryAddresses];
-										updated[index] = { ...updated[index], kod: e.target.value };
-										setDeliveryAddresses(updated);
-									}}
-								/>
-								<input
-									type="text"
-									placeholder="Państwo"
-									className="w-full px-3 py-1 border rounded"
-									value={address.panstwo || ""}
-									onChange={(e) => {
-										const updated = [...deliveryAddresses];
-										updated[index] = { ...updated[index], panstwo: e.target.value };
-										setDeliveryAddresses(updated);
-									}}
-								/>
-							</div>
-						))}
-
-            <div className="flex gap-4 justify-center">
-			  <button type="button" onClick={addDeliveryAddress} className="text-blue-600 underline text-sm">
-				Dodaj kolejne miejsce
-			  </button>
-			  {deliveryAddresses.length > 1 && (
-				<button type="button" onClick={removeLastDeliveryAddress} className="text-red-600 underline text-sm">
-				  Cofnij ostatnie
-				</button>
-			  )}
-			</div>
-          </div>
-        </div>
-      </div>
-	  
-	{/* Towar */}
-	<div>
-	  <h2 className="font-semibold">Towar</h2>
-	  <div className="grid grid-cols-2 gap-4">
-		<input
-			type="text"
-			placeholder="Ilość palet"
-			className="px-3 py-1 border rounded"
-			value={palety}
-			onChange={(e) => setPalety(e.target.value)}
-		/>
-		<input
-			type="text"
-			placeholder="Waga (kg)"
-			className="px-3 py-1 border rounded"
-			value={waga}
-			onChange={(e) => setWaga(e.target.value)}
-		/>
-		<input
-			type="text"
-			placeholder="Wymiar palet"
-			className="px-3 py-1 border rounded"
-			value={wymiar}
-			onChange={(e) => setWymiar(e.target.value)}
-		/>
-		<input
-			type="text"
-			placeholder="LDM"
-			className="px-3 py-1 border rounded"
-			value={ldm}
-			onChange={(e) => setLdm(e.target.value)}
-		/>
-	  </div>
-	</div>
-
-	{/* Odprawa celna: eksport / import */}
-	<div className="flex gap-8">
-	  {/* Eksportowa */}
-	  <div className="flex-1">
-		<h2 className="font-semibold text-center mb-2">Miejsce odprawy celnej eksportowej</h2>
-		<div className="flex flex-col items-center space-y-2">
-		  <label>
-			<input
-			  type="radio"
-			  name="exportCustoms"
-			  value="odbior"
-			  checked={exportCustomsOption === "odbior"}
-			  onChange={() => setExportCustomsOption("odbior")}
-			/>
-			<span className="ml-2">Tak, w miejscu odbioru towaru</span>
-		  </label>
-		  <label>
-			<input
-			  type="radio"
-			  name="exportCustoms"
-			  value="adres"
-			  checked={exportCustomsOption === "adres"}
-			  onChange={() => setExportCustomsOption("adres")}
-			/>
-			<span className="ml-2">Podaj adres</span>
-		  </label>
-
-		  {exportCustomsOption === "adres" && (
-				<div className="w-full space-y-2 border-t pt-2">
-					<input
-						type="text"
-						placeholder="Nazwa firmy"
-						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.nazwa || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, nazwa: e.target.value })}
-					/>
 					<input
 						type="text"
 						placeholder="Ulica i nr budynku"
 						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.ulica || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, ulica: e.target.value })}
+						value={zlUlica}
+						onChange={(e) => setZlUlica(e.target.value)}
 					/>
 					<input
 						type="text"
 						placeholder="Miejscowość"
 						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.miasto || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, miasto: e.target.value })}
+						value={zlMiasto}
+						onChange={(e) => setZlMiasto(e.target.value)}
 					/>
 					<input
 						type="text"
 						placeholder="Kod pocztowy"
 						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.kod || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, kod: e.target.value })}
+						value={zlKodPocztowy}
+						onChange={(e) => setZlKodPocztowy(e.target.value)}
 					/>
 					<input
 						type="text"
 						placeholder="Państwo"
 						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.panstwo || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, panstwo: e.target.value })}
+						value={zlPanstwo}
+						onChange={(e) => setZlPanstwo(e.target.value)}
+					/>
+
+					{!showOtherIds ? (
+						<>
+							<input
+								type="text"
+								placeholder="VAT"
+								value={vat}
+								onChange={(e) => setVat(e.target.value)}
+								className="w-full px-3 py-1 border rounded"
+							/>
+							<button
+								type="button"
+								onClick={() => setShowOtherIds(true)}
+								className="text-blue-600 underline text-sm"
+							>
+								Nie masz VAT? Dodaj inny numer
+							</button>
+						</>
+					) : (
+						<div className="space-y-2">
+							<input
+								type="text"
+								placeholder="NIP"
+								className="w-full px-3 py-1 border rounded"
+								value={zlNip}
+								onChange={(e) => setZlNip(e.target.value)}
+							/>
+							<input
+								type="text"
+								placeholder="REGON"
+								className="w-full px-3 py-1 border rounded"
+								value={zlRegon}
+								onChange={(e) => setZlRegon(e.target.value)}
+							/>
+							<input
+								type="text"
+								placeholder="EORI"
+								className="w-full px-3 py-1 border rounded"
+								value={zlEori}
+								onChange={(e) => setZlEori(e.target.value)}
+							/>
+							<input
+								type="text"
+								placeholder="PESEL"
+								className="w-full px-3 py-1 border rounded"
+								value={zlPesel}
+								onChange={(e) => setZlPesel(e.target.value)}
+							/>
+						</div>
+					)}
+				</div>
+			</div>
+
+				{/* Daty */}
+				<div className="flex gap-8">
+					<div className="flex-1">
+						<h2 className="font-semibold mb-2 text-center">Data załadunku</h2>
+						<div className="flex flex-col items-center">
+							<div className="mb-2">
+								{!showPickupRange ? (
+									<DatePicker
+										selected={pickupDate}
+										onChange={(date) => setPickupDate(date)}
+										dateFormat="dd/MM/yyyy"
+										inline
+									/>
+								) : (
+									<DatePicker
+										selectsRange
+										startDate={pickupRange[0]}
+										endDate={pickupRange[1]}
+										onChange={(update) => setPickupRange(update)}
+										dateFormat="dd/MM/yyyy"
+										inline
+									/>
+								)}
+							</div>
+							<label className="text-sm flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={showPickupRange}
+									onChange={() => setShowPickupRange(!showPickupRange)}
+								/>
+								Przedział dat
+							</label>
+							<label className="text-sm flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={pickupTimeIsRange}
+									onChange={() => setPickupTimeIsRange(!pickupTimeIsRange)}
+								/>
+								Przedział godzin
+							</label>
+							<div className="mt-2">
+								{!pickupTimeIsRange ? (
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={pickupTime}
+										onChange={(e) => setPickupTime(e.target.value)}
+									/>
+								) : (
+									<div className="flex gap-2">
+										<input
+											type="time"
+											className="px-3 py-1 border rounded"
+											value={pickupTimeRange[0]}
+											onChange={(e) =>
+												setPickupTimeRange([e.target.value, pickupTimeRange[1]])
+											}
+										/>
+										<span className="self-center">–</span>
+										<input
+											type="time"
+											className="px-3 py-1 border rounded"
+											value={pickupTimeRange[1]}
+											onChange={(e) =>
+												setPickupTimeRange([pickupTimeRange[0], e.target.value])
+											}
+										/>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+
+					<div className="flex-1">
+						<h2 className="font-semibold mb-2 text-center">Data rozładunku</h2>
+						<div className="flex flex-col items-center">
+							<div className="mb-2">
+								{!showDeliveryRange ? (
+									<DatePicker
+										selected={deliveryDate}
+										onChange={(date) => setDeliveryDate(date)}
+										dateFormat="dd/MM/yyyy"
+										inline
+									/>
+								) : (
+									<DatePicker
+										selectsRange
+										startDate={deliveryRange[0]}
+										endDate={deliveryRange[1]}
+										onChange={(update) => setDeliveryRange(update)}
+										dateFormat="dd/MM/yyyy"
+										inline
+									/>
+								)}
+							</div>
+							<label className="text-sm flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={showDeliveryRange}
+									onChange={() => setShowDeliveryRange(!showDeliveryRange)}
+								/>
+								Przedział dat
+							</label>
+							<label className="text-sm flex items-center gap-2 mt-1">
+								<input
+									type="checkbox"
+									checked={deliveryTimeIsRange}
+									onChange={() => setDeliveryTimeIsRange(!deliveryTimeIsRange)}
+								/>
+								Przedział godzin
+							</label>
+							<div className="mt-2">
+								{!deliveryTimeIsRange ? (
+									<input
+										type="time"
+										className="px-3 py-1 border rounded"
+										value={deliveryTime}
+										onChange={(e) => setDeliveryTime(e.target.value)}
+									/>
+								) : (
+									<div className="flex gap-2">
+										<input
+											type="time"
+											className="px-3 py-1 border rounded"
+											value={deliveryTimeRange[0]}
+											onChange={(e) =>
+												setDeliveryTimeRange([e.target.value, deliveryTimeRange[1]])
+											}
+										/>
+										<span className="self-center">–</span>
+										<input
+											type="time"
+											className="px-3 py-1 border rounded"
+											value={deliveryTimeRange[1]}
+											onChange={(e) =>
+												setDeliveryTimeRange([deliveryTimeRange[0], e.target.value])
+											}
+										/>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+				</div>
+				
+				{/* Adresy odbioru i dostawy */}
+				<div className="flex gap-8">
+					<div className="flex-1">
+						<h2 className="font-semibold text-center mb-2">Adres odbioru towaru</h2>
+						<div className="space-y-4">
+							{pickupAddresses.map((address, index) => (
+								<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
+									<input
+										type="text"
+										placeholder="Nazwa firmy"
+										className="w-full px-3 py-1 border rounded"
+										value={address.nazwa || ""}
+										onChange={(e) => {
+											const updated = [...pickupAddresses];
+											updated[index] = { ...updated[index], nazwa: e.target.value };
+											setPickupAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Ulica i nr budynku"
+										className="w-full px-3 py-1 border rounded"
+										value={address.ulica || ""}
+										onChange={(e) => {
+											const updated = [...pickupAddresses];
+											updated[index] = { ...updated[index], ulica: e.target.value };
+											setPickupAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Miejscowość"
+										className="w-full px-3 py-1 border rounded"
+										value={address.miasto || ""}
+										onChange={(e) => {
+											const updated = [...pickupAddresses];
+											updated[index] = { ...updated[index], miasto: e.target.value };
+											setPickupAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Kod pocztowy"
+										className="w-full px-3 py-1 border rounded"
+										value={address.kod || ""}
+										onChange={(e) => {
+											const updated = [...pickupAddresses];
+											updated[index] = { ...updated[index], kod: e.target.value };
+											setPickupAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Państwo"
+										className="w-full px-3 py-1 border rounded"
+										value={address.panstwo || ""}
+										onChange={(e) => {
+											const updated = [...pickupAddresses];
+											updated[index] = { ...updated[index], panstwo: e.target.value };
+											setPickupAddresses(updated);
+										}}
+									/>
+								</div>
+							))}
+
+							<div className="flex gap-4 justify-center">
+					<button type="button" onClick={addPickupAddress} className="text-blue-600 underline text-sm">
+					Dodaj kolejne miejsce
+					</button>
+					{pickupAddresses.length > 1 && (
+					<button type="button" onClick={removeLastPickupAddress} className="text-red-600 underline text-sm">
+						Cofnij ostatnie
+					</button>
+					)}
+				</div>
+						</div>
+					</div>
+
+					<div className="flex-1">
+						<h2 className="font-semibold text-center mb-2">Adres dostawy towaru</h2>
+						<div className="space-y-4">
+							{deliveryAddresses.map((address, index) => (
+								<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
+									<input
+										type="text"
+										placeholder="Nazwa firmy"
+										className="w-full px-3 py-1 border rounded"
+										value={address.nazwa || ""}
+										onChange={(e) => {
+											const updated = [...deliveryAddresses];
+											updated[index] = { ...updated[index], nazwa: e.target.value };
+											setDeliveryAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Ulica i nr budynku"
+										className="w-full px-3 py-1 border rounded"
+										value={address.ulica || ""}
+										onChange={(e) => {
+											const updated = [...deliveryAddresses];
+											updated[index] = { ...updated[index], ulica: e.target.value };
+											setDeliveryAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Miejscowość"
+										className="w-full px-3 py-1 border rounded"
+										value={address.miasto || ""}
+										onChange={(e) => {
+											const updated = [...deliveryAddresses];
+											updated[index] = { ...updated[index], miasto: e.target.value };
+											setDeliveryAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Kod pocztowy"
+										className="w-full px-3 py-1 border rounded"
+										value={address.kod || ""}
+										onChange={(e) => {
+											const updated = [...deliveryAddresses];
+											updated[index] = { ...updated[index], kod: e.target.value };
+											setDeliveryAddresses(updated);
+										}}
+									/>
+									<input
+										type="text"
+										placeholder="Państwo"
+										className="w-full px-3 py-1 border rounded"
+										value={address.panstwo || ""}
+										onChange={(e) => {
+											const updated = [...deliveryAddresses];
+											updated[index] = { ...updated[index], panstwo: e.target.value };
+											setDeliveryAddresses(updated);
+										}}
+									/>
+								</div>
+							))}
+
+							<div className="flex gap-4 justify-center">
+					<button type="button" onClick={addDeliveryAddress} className="text-blue-600 underline text-sm">
+					Dodaj kolejne miejsce
+					</button>
+					{deliveryAddresses.length > 1 && (
+					<button type="button" onClick={removeLastDeliveryAddress} className="text-red-600 underline text-sm">
+						Cofnij ostatnie
+					</button>
+					)}
+				</div>
+						</div>
+					</div>
+				</div>
+			
+		{/* Towar */}
+		<div>
+			<h2 className="font-semibold">Towar</h2>
+			<div className="grid grid-cols-2 gap-4">
+			<input
+				type="text"
+				placeholder="Ilość palet"
+				className="px-3 py-1 border rounded"
+				value={palety}
+				onChange={(e) => setPalety(e.target.value)}
+			/>
+			<input
+				type="text"
+				placeholder="Waga (kg)"
+				className="px-3 py-1 border rounded"
+				value={waga}
+				onChange={(e) => setWaga(e.target.value)}
+			/>
+			<input
+				type="text"
+				placeholder="Wymiar palet"
+				className="px-3 py-1 border rounded"
+				value={wymiar}
+				onChange={(e) => setWymiar(e.target.value)}
+			/>
+			<input
+				type="text"
+				placeholder="LDM"
+				className="px-3 py-1 border rounded"
+				value={ldm}
+				onChange={(e) => setLdm(e.target.value)}
+			/>
+			</div>
+		</div>
+
+		{/* Odprawa celna: eksport / import */}
+		<div className="flex gap-8">
+			{/* Eksportowa */}
+			<div className="flex-1">
+			<h2 className="font-semibold text-center mb-2">Miejsce odprawy celnej eksportowej</h2>
+			<div className="flex flex-col items-center space-y-2">
+				<label>
+				<input
+					type="radio"
+					name="exportCustoms"
+					value="odbior"
+					checked={exportCustomsOption === "odbior"}
+					onChange={() => setExportCustomsOption("odbior")}
+				/>
+				<span className="ml-2">Tak, w miejscu odbioru towaru</span>
+				</label>
+				<label>
+				<input
+					type="radio"
+					name="exportCustoms"
+					value="adres"
+					checked={exportCustomsOption === "adres"}
+					onChange={() => setExportCustomsOption("adres")}
+				/>
+				<span className="ml-2">Podaj adres</span>
+				</label>
+
+				{exportCustomsOption === "adres" && (
+					<div className="w-full space-y-2 border-t pt-2">
+						<div className="relative">
+							<input
+								type="text"
+								placeholder="Nazwa firmy"
+								className="w-full px-3 py-1 border rounded"
+								value={exportCustomsAddress.nazwa || ""}
+								onChange={handleExportCustomsNameChange}
+							/>
+							{exportCustomsSuggestions.length > 0 && (
+								<ul className="absolute z-50 bg-white border w-full">
+									{exportCustomsSuggestions.map((agency) => (
+										<li
+											key={agency.id}
+											className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+											onClick={() => handleExportCustomsSelect(agency)}
+										>
+											{agency.nazwa}
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+						<input
+							type="text"
+							placeholder="Ulica i nr budynku"
+							className="w-full px-3 py-1 border rounded"
+							value={exportCustomsAddress.ulica || ""}
+							onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, ulica: e.target.value })}
+						/>
+						<input
+							type="text"
+							placeholder="Miejscowość"
+							className="w-full px-3 py-1 border rounded"
+							value={exportCustomsAddress.miasto || ""}
+							onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, miasto: e.target.value })}
+						/>
+						<input
+							type="text"
+							placeholder="Kod pocztowy"
+							className="w-full px-3 py-1 border rounded"
+							value={exportCustomsAddress.kod || ""}
+							onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, kod: e.target.value })}
+						/>
+						<input
+							type="text"
+							placeholder="Państwo"
+							className="w-full px-3 py-1 border rounded"
+							value={exportCustomsAddress.panstwo || ""}
+							onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, panstwo: e.target.value })}
+						/>
+						<textarea
+							placeholder="Uwagi"
+							className="w-full px-3 py-1 border rounded"
+							value={exportCustomsAddress.uwagi || ""}
+							onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, uwagi: e.target.value })}
+						/>
+					</div>
+				)}
+			</div>
+			</div>
+
+			{/* Importowa */}
+			<div className="flex-1">
+			<h2 className="font-semibold text-center mb-2">Miejsce odprawy celnej importowej</h2>
+			<div className="flex flex-col items-center space-y-2">
+				<label>
+				<input
+					type="radio"
+					name="importCustoms"
+					value="odbior"
+					checked={importCustomsOption === "odbior"}
+					onChange={() => setImportCustomsOption("odbior")}
+				/>
+				<span className="ml-2">System GVMS</span>
+				</label>
+				<label>
+				<input
+					type="radio"
+					name="importCustoms"
+					value="adres"
+					checked={importCustomsOption === "adres"}
+					onChange={() => setImportCustomsOption("adres")}
+				/>
+				<span className="ml-2">Podaj adres</span>
+				</label>
+
+				{importCustomsOption === "adres" && (
+				<div className="w-full space-y-2 border-t pt-2">
+					<input
+						type="text"
+						placeholder="Nazwa firmy"
+						className="w-full px-3 py-1 border rounded"
+						value={importCustomsAddress.nazwa || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, nazwa: e.target.value })}
+					/>
+					<input
+						type="text"
+						placeholder="Ulica i nr budynku"
+						className="w-full px-3 py-1 border rounded"
+						value={importCustomsAddress.ulica || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, ulica: e.target.value })}
+					/>
+					<input
+						type="text"
+						placeholder="Miejscowość"
+						className="w-full px-3 py-1 border rounded"
+						value={importCustomsAddress.miasto || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, miasto: e.target.value })}
+					/>
+					<input
+						type="text"
+						placeholder="Kod pocztowy"
+						className="w-full px-3 py-1 border rounded"
+						value={importCustomsAddress.kod || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, kod: e.target.value })}
+					/>
+					<input
+						type="text"
+						placeholder="Państwo"
+						className="w-full px-3 py-1 border rounded"
+						value={importCustomsAddress.panstwo || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, panstwo: e.target.value })}
 					/>
 					<textarea
 						placeholder="Uwagi"
 						className="w-full px-3 py-1 border rounded"
-						value={exportCustomsAddress.uwagi || ""}
-						onChange={(e) => setExportCustomsAddress({ ...exportCustomsAddress, uwagi: e.target.value })}
+						value={importCustomsAddress.uwagi || ""}
+						onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, uwagi: e.target.value })}
 					/>
 				</div>
 			)}
-		</div>
-	  </div>
-
-	  {/* Importowa */}
-	  <div className="flex-1">
-		<h2 className="font-semibold text-center mb-2">Miejsce odprawy celnej importowej</h2>
-		<div className="flex flex-col items-center space-y-2">
-		  <label>
-			<input
-			  type="radio"
-			  name="importCustoms"
-			  value="odbior"
-			  checked={importCustomsOption === "odbior"}
-			  onChange={() => setImportCustomsOption("odbior")}
-			/>
-			<span className="ml-2">System GVMS</span>
-		  </label>
-		  <label>
-			<input
-			  type="radio"
-			  name="importCustoms"
-			  value="adres"
-			  checked={importCustomsOption === "adres"}
-			  onChange={() => setImportCustomsOption("adres")}
-			/>
-			<span className="ml-2">Podaj adres</span>
-		  </label>
-
-		  {importCustomsOption === "adres" && (
-			<div className="w-full space-y-2 border-t pt-2">
-				<input
-					type="text"
-					placeholder="Nazwa firmy"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.nazwa || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, nazwa: e.target.value })}
-				/>
-				<input
-					type="text"
-					placeholder="Ulica i nr budynku"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.ulica || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, ulica: e.target.value })}
-				/>
-				<input
-					type="text"
-					placeholder="Miejscowość"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.miasto || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, miasto: e.target.value })}
-				/>
-				<input
-					type="text"
-					placeholder="Kod pocztowy"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.kod || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, kod: e.target.value })}
-				/>
-				<input
-					type="text"
-					placeholder="Państwo"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.panstwo || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, panstwo: e.target.value })}
-				/>
-				<textarea
-					placeholder="Uwagi"
-					className="w-full px-3 py-1 border rounded"
-					value={importCustomsAddress.uwagi || ""}
-					onChange={(e) => setImportCustomsAddress({ ...importCustomsAddress, uwagi: e.target.value })}
-				/>
 			</div>
-		)}
+			</div>
 		</div>
-	  </div>
-	</div>
 
-	{/* Fracht + Termin płatności */}
-	<div className="border-t pt-6">
-	  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
-		
-		{/* Fracht */}
-		<div className="w-full max-w-xs flex flex-col items-center">
-		  <h2 className="font-semibold text-center mb-4">Fracht</h2>
+		{/* Fracht + Termin płatności */}
+		<div className="border-t pt-6">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
+			
+			{/* Fracht */}
+			<div className="w-full max-w-xs flex flex-col items-center">
+				<h2 className="font-semibold text-center mb-4">Fracht</h2>
 
-		  {/* Cena + Waluta w jednym rzędzie */}
-		  <div className="flex items-end gap-4">
-			{/* Cena */}
-			<div className="flex flex-col items-center">
-			  <label className="text-sm mb-1 text-center">Cena</label>
-			  <input
+				{/* Cena + Waluta w jednym rzędzie */}
+				<div className="flex items-end gap-4">
+				{/* Cena */}
+				<div className="flex flex-col items-center">
+					<label className="text-sm mb-1 text-center">Cena</label>
+					<input
+						type="text"
+						placeholder="Wpisz cenę"
+						className="px-3 py-1 border rounded text-center w-32"
+						value={cena}
+						onChange={(e) => setCena(e.target.value)}
+					/>
+				</div>
+
+				{/* Waluta */}
+				<div className="flex flex-col items-center">
+					<label className="text-sm mb-1 text-center">Waluta</label>
+					<select
+						className="px-3 py-1 border rounded w-20"
+						style={{ textAlignLast: 'center' }}
+						value={currency}
+						onChange={(e) => setCurrency(e.target.value)}
+					>
+						<option value="EUR">EUR</option>
+						<option value="PLN">PLN</option>
+						<option value="CZ">CZ</option>
+						<option value="inna">Inna</option>
+					</select>
+				</div>
+				</div>
+
+				{/* Inna waluta */}
+				{currency === "inna" && (
+				<div className="flex flex-col items-center mt-2">
+					<label className="text-sm mb-1 text-center">Podaj walutę</label>
+					<input
 					type="text"
-					placeholder="Wpisz cenę"
+					placeholder="np. USD"
 					className="px-3 py-1 border rounded text-center w-32"
-					value={cena}
-					onChange={(e) => setCena(e.target.value)}
-				/>
+					value={customCurrency}
+					onChange={(e) => setCustomCurrency(e.target.value)}
+					/>
+				</div>
+				)}
 			</div>
 
-			{/* Waluta */}
-			<div className="flex flex-col items-center">
-			  <label className="text-sm mb-1 text-center">Waluta</label>
-			  <select
-				  className="px-3 py-1 border rounded w-20"
-				  style={{ textAlignLast: 'center' }}
-				  value={currency}
-				  onChange={(e) => setCurrency(e.target.value)}
-				>
-				  <option value="EUR">EUR</option>
-				  <option value="PLN">PLN</option>
-				  <option value="CZ">CZ</option>
-				  <option value="inna">Inna</option>
-				</select>
-			</div>
-		  </div>
+			{/* Termin płatności */}
+			<div className="w-full max-w-xs flex flex-col items-center">
+				<h2 className="font-semibold text-center mb-4">Termin płatności</h2>
+				<div className="flex gap-6 justify-center items-start flex-wrap">
+				<div className="flex flex-col items-center">
+					<label className="text-sm mb-1">Ilość dni</label>
+					<input
+					type="text"
+					placeholder="Np. 30"
+					className="px-3 py-1 border rounded w-24 text-center"
+					value={paymentDays}
+					onChange={(e) => setPaymentDays(e.target.value)}
+					/>
+				</div>
 
-		  {/* Inna waluta */}
-		  {currency === "inna" && (
-			<div className="flex flex-col items-center mt-2">
-			  <label className="text-sm mb-1 text-center">Podaj walutę</label>
-			  <input
-				type="text"
-				placeholder="np. USD"
-				className="px-3 py-1 border rounded text-center w-32"
-				value={customCurrency}
-				onChange={(e) => setCustomCurrency(e.target.value)}
-			  />
+				<div className="flex flex-col items-start space-y-2">
+					<label className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						checked={sendEmail}
+						onChange={() => setSendEmail(!sendEmail)}
+					/>
+					e-mail
+					</label>
+					<label className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						checked={sendPost}
+						onChange={() => setSendPost(!sendPost)}
+					/>
+					poczta
+					</label>
+				</div>
+				</div>
 			</div>
-		  )}
+
+			</div>
 		</div>
 
-		{/* Termin płatności */}
-		<div className="w-full max-w-xs flex flex-col items-center">
-		  <h2 className="font-semibold text-center mb-4">Termin płatności</h2>
-		  <div className="flex gap-6 justify-center items-start flex-wrap">
-			<div className="flex flex-col items-center">
-			  <label className="text-sm mb-1">Ilość dni</label>
-			  <input
-				type="text"
-				placeholder="Np. 30"
-				className="px-3 py-1 border rounded w-24 text-center"
-				value={paymentDays}
-				onChange={(e) => setPaymentDays(e.target.value)}
-			  />
+		{/* Dodatkowe uwagi */}
+		<div>
+			<button
+			onClick={() => setExtraNotesVisible(!extraNotesVisible)}
+			className="text-blue-600 underline text-sm"
+			>
+			{extraNotesVisible ? "Ukryj dodatkowe uwagi" : "Dodatkowe uwagi"}
+			</button>
+			{extraNotesVisible && (
+			<textarea
+				placeholder="Uwagi dodatkowe"
+				className="w-full px-3 py-1 border rounded mt-2"
+				value={uwagi}
+				onChange={(e) => setUwagi(e.target.value)}
+			/>
+				)}
 			</div>
-
-			<div className="flex flex-col items-start space-y-2">
-			  <label className="flex items-center gap-2">
-				<input
-				  type="checkbox"
-				  checked={sendEmail}
-				  onChange={() => setSendEmail(!sendEmail)}
-				/>
-				e-mail
-			  </label>
-			  <label className="flex items-center gap-2">
-				<input
-				  type="checkbox"
-				  checked={sendPost}
-				  onChange={() => setSendPost(!sendPost)}
-				/>
-				poczta
-			  </label>
-			</div>
-		  </div>
+			<button
+				onClick={handleSubmit}
+				className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded disabled:opacity-50"
+				disabled={isSubmitting}
+			>
+				{isSubmitting ? "Zapisywanie..." : "Zapisz zlecenie"}
+			</button>	
 		</div>
-
-	  </div>
-	</div>
-
-	{/* Dodatkowe uwagi */}
-	<div>
-	  <button
-		onClick={() => setExtraNotesVisible(!extraNotesVisible)}
-		className="text-blue-600 underline text-sm"
-	  >
-		{extraNotesVisible ? "Ukryj dodatkowe uwagi" : "Dodatkowe uwagi"}
-	  </button>
-	  {extraNotesVisible && (
-		<textarea
-			placeholder="Uwagi dodatkowe"
-			className="w-full px-3 py-1 border rounded mt-2"
-			value={uwagi}
-			onChange={(e) => setUwagi(e.target.value)}
-		/>
-		  )}
-		</div>
-	  <button
-			onClick={handleSubmit}
-			className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded disabled:opacity-50"
-			disabled={isSubmitting}
-		>
-			{isSubmitting ? "Zapisywanie..." : "Zapisz zlecenie"}
-		</button>	
-	  </div>
-  );
+	);
 }
