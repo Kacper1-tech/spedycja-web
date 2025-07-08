@@ -7,6 +7,7 @@ import TransportTab from "./pages/TransportTab";
 import Plan from "./pages/Plan";
 import Zlecenia from "./pages/Zlecenia";
 import Ksiegowosc from "./pages/Ksiegowosc";
+import Kontrahenci from "./pages/Kontrahenci";
 import Rejestr from "./pages/Rejestr";
 import Dokumenty from "./pages/Dokumenty";
 import Login from "./pages/Login";
@@ -55,13 +56,14 @@ export default function App() {
           <div className="w-[95%] mx-auto">
             <Routes>
 							<Route path="/" element={<Home />} />
-              <Route path="/" element={<Zlecenia />} />
+              <Route path="/zlecenia" element={<Zlecenia />} />
               <Route path="/zlecenia/import/dodaj" element={<DodajZlecenieImport />} />
 							<Route path="/zlecenia/import/edytuj/:id" element={<DodajZlecenieImport />} />
 							<Route path="/zlecenia/pozostale/dodaj" element={<DodajZleceniePozostale />} />
               <Route path="/zlecenia/wszystkie" element={<WszystkieZlecenia />} />
               <Route path="/transport" element={<TransportTab />} />
               <Route path="/plan" element={<Plan />} />
+							<Route path="/kontrahenci" element={<Kontrahenci />} />
               <Route path="/kontrahenci/lista" element={<KontrahenciTab />} />
 							<Route path="/kontrahenci/dodaj" element={<DodajKontrahenta />} />
               <Route path="/ksiegowosc" element={<Ksiegowosc />} />

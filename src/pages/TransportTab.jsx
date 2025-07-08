@@ -71,6 +71,12 @@ export default function TransportTab() {
 		setExportOrders((exportData || []).sort(sortByDate));
 		setImportOrders((importData || []).sort(sortByDate));
 		setPozostaleOrders((pozostaleData || []).sort(sortByDate));
+		
+		setOrders([
+			...(exportData || []),
+			...(importData || []),
+			...(pozostaleData || [])
+		]);
 	};
 
 	const handleAddDriver = async () => {
@@ -638,7 +644,8 @@ export default function TransportTab() {
 																show: true,
 																x: e.clientX,
 																y: e.clientY,
-																index: idx
+																index: idx,
+																type: "export"
 															});
 															setSelectedRow(row);
 															setSelectedExportIndex(idx);
@@ -710,21 +717,32 @@ export default function TransportTab() {
 						<button
 							className="block w-full text-left hover:bg-gray-100 px-2 py-1"
 							onClick={() => {
+								if (!selectedRow) return;
+								if (contextMenu.index === null || contextMenu.index === undefined) return;
+
 								if (contextMenu.type === "export") {
-									const ex = selectedRow.export[contextMenu.index];
+									const ex = selectedRow.export?.[contextMenu.index];
+									if (!ex) return;
+
+									console.log("Szukam:", ex.numer);
+									console.log("Orders:", orders);
+
 									const found = orders.find(o => o.numer_zlecenia === ex.numer);
 									if (found) {
 										setSelectedOrder(found);
 										setShowModal(true);
 									}
 								} else if (contextMenu.type === "import") {
-									const imp = selectedRow.import[contextMenu.index];
+									const imp = selectedRow.import?.[contextMenu.index];
+									if (!imp) return;
+
 									const found = orders.find(o => o.numer_zlecenia === imp.numer);
 									if (found) {
 										setSelectedOrder(found);
 										setShowModal(true);
 									}
 								}
+
 								setContextMenu({ show: false, x: 0, y: 0, index: null, type: null });
 							}}
 						>
@@ -733,17 +751,27 @@ export default function TransportTab() {
 						<button
 							className="block w-full text-left hover:bg-gray-100 px-2 py-1"
 							onClick={() => {
+								if (!selectedRow) return;
+								if (contextMenu.index === null) return;
+
 								if (contextMenu.type === "export") {
-									setSelectedOrderNumber(selectedRow.export[contextMenu.index].numer);
-									setNewExportData(selectedRow.export[contextMenu.index].dane);
+									const ex = selectedRow.export?.[contextMenu.index];
+									if (!ex) return;
+
+									setSelectedOrderNumber(ex.numer);
+									setNewExportData(ex.dane);
 								} else if (contextMenu.type === "import") {
-									setNewImport(selectedRow.import[contextMenu.index].numer);
+									const imp = selectedRow.import?.[contextMenu.index];
+									if (!imp) return;
+
+									setNewImport(imp.numer);
 									setNewImportData(
-										typeof selectedRow.import[contextMenu.index].dane === "object"
-											? JSON.stringify(selectedRow.import[contextMenu.index].dane)
-											: String(selectedRow.import[contextMenu.index].dane)
+										typeof imp.dane === "object"
+											? JSON.stringify(imp.dane)
+											: String(imp.dane)
 									);
 								}
+
 								setContextMenu({ show: false, x: 0, y: 0, index: null, type: null });
 							}}
 						>
