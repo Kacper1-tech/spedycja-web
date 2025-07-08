@@ -22,6 +22,7 @@ import DodajFaktureKosztowa from "./pages/Ksiegowosc/DodajFaktureKosztowa";
 import ListaFakturKosztowych from "./pages/Ksiegowosc/ListaFakturKosztowych";
 import KontrahenciTab from "./pages/Kontrahenci/KontrahenciTab";
 import DodajKontrahenta from "./pages/Kontrahenci/DodajKontrahenta";
+import Wydatki from "./pages/Ksiegowosc/Wydatki";
 
 
 export default function App() {
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="/ksiegowosc" element={<Ksiegowosc />} />
 							<Route path="/ksiegowosc/faktury/kosztowe/dodaj" element={<DodajFaktureKosztowa />} />
 							<Route path="/ksiegowosc/faktury/kosztowe/lista" element={<ListaFakturKosztowych />} />
+							<Route path="/ksiegowosc/wydatki" element={<Wydatki />} />
               <Route path="/rejestr" element={<Rejestr />} />
               <Route path="/dokumenty" element={<Dokumenty />} />
 							<Route path="/zlecenia/export/dodaj" element={<DodajZlecenieExport />} />

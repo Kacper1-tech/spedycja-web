@@ -251,6 +251,12 @@ export default function NavigationBar() {
 											</NavLink>
 										</div>
 									)}
+									<NavLink
+										to="/ksiegowosc/wydatki"
+										className="block px-4 py-2 hover:bg-gray-100 whitespace-nowrap"
+									>
+										Wydatki
+									</NavLink>
 								</div>
 							</div>
 						)}

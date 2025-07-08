@@ -8,3 +8,6 @@ export const getCurrencySymbol = (code) => {
     default: return code || "";
   }
 };
+
+// Lista dostępnych walut:
+export const CURRENCIES = ["PLN", "EUR", "USD", "GBP", "CZK"];

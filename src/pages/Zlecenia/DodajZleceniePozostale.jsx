@@ -250,12 +250,12 @@ export default function DodajZleceniePozostale() {
 			const { data: existingExportAgency } = await supabase
 				.from("agencje_celne")
 				.select("*")
-				.eq("nazwa", exportCustomsAddress.company)
+				.eq("nazwa", exportCustomsAddress.company.trim())
 				.single();
 
 			if (!existingExportAgency) {
 				await supabase.from("agencje_celne").insert({
-					nazwa: exportCustomsAddress.company,
+					nazwa: exportCustomsAddress.company.trim(),
 					ulica: exportCustomsAddress.street,
 					miasto: exportCustomsAddress.city,
 					kod: exportCustomsAddress.zip,
@@ -269,12 +269,12 @@ export default function DodajZleceniePozostale() {
 			const { data: existingImportAgency } = await supabase
 				.from("agencje_celne")
 				.select("*")
-				.eq("nazwa", importCustomsAddress.company)
+				.eq("nazwa", importCustomsAddress.company.trim())
 				.single();
 
 			if (!existingImportAgency) {
 				await supabase.from("agencje_celne").insert({
-					nazwa: importCustomsAddress.company,
+					nazwa: importCustomsAddress.company.trim(),
 					ulica: importCustomsAddress.street,
 					miasto: importCustomsAddress.city,
 					kod: importCustomsAddress.zip,

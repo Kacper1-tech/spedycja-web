@@ -760,16 +760,16 @@ export default function TransportTab() {
 				<table className="w-full border text-xs">
 					<thead>
 						<tr className="bg-gray-100">
-							<th className="text-left">Nr zlec.</th>
-							<th className="text-left">D.zał</th>
-							<th className="text-left">Zleceniodawca</th>
-							<th className="text-left">LDM</th>
-							<th className="text-left">Waga</th>
-							<th className="text-left">M.zał</th>
-							<th className="text-left">M.rozł</th>
-							<th className="text-left">D.rozł</th>
-							<th className="text-left">Cena</th>
-							<th className="text-left">Akcje</th>
+							<th className="text-center">Nr zlec.</th>
+							<th className="text-center">D.zał</th>
+							<th className="text-center">Zleceniodawca</th>
+							<th className="text-center">LDM</th>
+							<th className="text-center">Waga</th>
+							<th className="text-center">M.zał</th>
+							<th className="text-center">M.rozł</th>
+							<th className="text-center">D.rozł</th>
+							<th className="text-center">Cena</th>
+							<th className="text-center">Akcje</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -777,21 +777,21 @@ export default function TransportTab() {
 						{exportOrders.map((o) => (
 							<tr key={o.id}>
 								<td className="border p-2">{o.numer_zlecenia}</td>
-								<td className="border p-2">{formatDateShort(o.pickup_date_start)}</td>
+								<td className="border p-2 text-center">{formatDateShort(o.pickup_date_start)}</td>
 								<td className="border p-2">{o.zl_nazwa}</td>
-								<td className="border p-2">{o.ldm}</td>
-								<td className="border p-2">{o.waga}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{o.ldm}</td>
+								<td className="border p-2 text-center">{o.waga}</td>
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
+								<td className="border p-2 text-center">
 									{o.cena} {getCurrencySymbol(o.waluta)}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									<button
 										onClick={() => handleHideOrder(o)}
 										className="bg-yellow-500 px-2 py-1 rounded text-white text-xs"
@@ -812,21 +812,21 @@ export default function TransportTab() {
 						{importOrders.map((o) => (
 							<tr key={o.id}>
 								<td className="border p-2">{o.numer_zlecenia}</td>
-								<td className="border p-2">{formatDateShort(o.pickup_date_start)}</td>
+								<td className="border p-2 text-center">{formatDateShort(o.pickup_date_start)}</td>
 								<td className="border p-2">{o.zl_nazwa}</td>
-								<td className="border p-2">{o.ldm}</td>
-								<td className="border p-2">{o.waga}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{o.ldm}</td>
+								<td className="border p-2 text-center">{o.waga}</td>
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
+								<td className="border p-2 text-center">
 									{o.cena} {getCurrencySymbol(o.waluta)}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									<button
 										onClick={() => handleHideOrder(o)}
 										className="bg-yellow-500 px-2 py-1 rounded text-white text-xs"
@@ -848,21 +848,21 @@ export default function TransportTab() {
 						{pozostaleOrders.map((o) => (
 							<tr key={o.id}>
 								<td className="border p-2">{o.numer_zlecenia}</td>
-								<td className="border p-2">{formatDateShort(o.pickup_date_start)}</td>
+								<td className="border p-2 text-center">{formatDateShort(o.pickup_date_start)}</td>
 								<td className="border p-2">{o.zl_nazwa}</td>
-								<td className="border p-2">{o.ldm}</td>
-								<td className="border p-2">{o.waga}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{o.ldm}</td>
+								<td className="border p-2 text-center">{o.waga}</td>
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
 								</td>
-								<td className="border p-2">{formatDateShort(o.delivery_date_start)}</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
+								<td className="border p-2 text-center">
 									{o.cena} {getCurrencySymbol(o.waluta)}
 								</td>
-								<td className="border p-2">
+								<td className="border p-2 text-center">
 									<button
 										onClick={() => handleHideOrder(o)}
 										className="bg-yellow-500 px-2 py-1 rounded text-white text-xs"
