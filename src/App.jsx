@@ -24,6 +24,7 @@ import ListaFakturKosztowych from "./pages/Ksiegowosc/ListaFakturKosztowych";
 import KontrahenciTab from "./pages/Kontrahenci/KontrahenciTab";
 import DodajKontrahenta from "./pages/Kontrahenci/DodajKontrahenta";
 import Wydatki from "./pages/Ksiegowosc/Wydatki";
+import WykazExportLTL from "./pages/Zlecenia/WykazExportLTL";
 
 
 export default function App() {
@@ -76,6 +77,7 @@ export default function App() {
 							<Route path="/zlecenia/export/edytuj/:id" element={<DodajZlecenieExport />} />
 							<Route path="/zlecenia/pozostale/edytuj/:id" element={<DodajZleceniePozostale />} />
 							<Route path="/zlecenia/export/lista" element={<ListaZlecenExport />} />
+							<Route path="/zlecenia/wykaz-export-ltl" element={<WykazExportLTL />} />
 							<Route path="/zlecenia/import/lista" element={<ListaZlecenImport />} />
 							<Route path="/zlecenia/pozostale/lista" element={<ListaZlecenPozostale />} />
             </Routes>

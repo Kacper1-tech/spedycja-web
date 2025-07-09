@@ -354,6 +354,22 @@ export default function DodajZlecenieExport() {
 				return;
 			}
 		}
+		
+		// Jeśli LDM to nie FTL — kopiujemy do wykaz_ltl
+		if (ldm.trim().toUpperCase() !== "FTL") {
+			const ltlPayload = { ...payload };
+
+			// Możesz dodać znacznik, że to LTL:
+			ltlPayload.typ = "LTL";
+
+			const { error: ltlError } = await supabase
+				.from("wykaz_ltl")
+				.insert([ltlPayload]);
+
+			if (ltlError) {
+				console.error("Błąd zapisu do wykaz_ltl:", ltlError.message);
+			}
+		}
 
 		alert(id ? "Zlecenie zaktualizowane." : "Zlecenie dodane.");
 		navigate("/zlecenia/export/lista");

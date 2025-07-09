@@ -66,11 +66,15 @@ export default function TransportTab() {
 			.select("*")
 			.eq("hidden_in_transport", false);
 
-		const sortByDate = (a, b) => new Date(a.pickup_date_start || "2100-12-31") - new Date(b.pickup_date_start || "2100-12-31");
+		const sortByDeliveryDate = (a, b) =>
+			new Date(a.delivery_date_start || "2100-12-31") - new Date(b.delivery_date_start || "2100-12-31");
 
-		setExportOrders((exportData || []).sort(sortByDate));
-		setImportOrders((importData || []).sort(sortByDate));
-		setPozostaleOrders((pozostaleData || []).sort(sortByDate));
+		const sortByPickupDate = (a, b) =>
+			new Date(a.pickup_date_start || "2100-12-31") - new Date(b.pickup_date_start || "2100-12-31");
+
+		setExportOrders((exportData || []).slice().sort(sortByDeliveryDate));
+		setImportOrders((importData || []).slice().sort(sortByPickupDate));
+		setPozostaleOrders((pozostaleData || []).slice().sort(sortByPickupDate));
 		
 		setOrders([
 			...(exportData || []),
