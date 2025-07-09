@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import { supabase } from '../../supabaseClient';
 import { useNavigate, useParams } from "react-router-dom";
+import { CURRENCIES, getCurrencySymbol } from "../../utils/currency";
 
 export default function DodajZleceniePozostale() {
   const [pickupAddresses, setPickupAddresses] = useState([{}]);
@@ -140,6 +141,15 @@ export default function DodajZleceniePozostale() {
 			fetchZlecenie();
 		}
 	}, [id]);
+	
+	const formatDate = (date) => {
+		if (!date) return null;
+		const d = date instanceof Date ? date : new Date(date); // ⬅️ ważne!
+		const year = d.getFullYear();
+		const month = `${d.getMonth() + 1}`.padStart(2, "0");
+		const day = `${d.getDate()}`.padStart(2, "0");
+		return `${year}-${month}-${day}`;
+	};
 
 	const handleSubmit = async () => {
 		if (isSubmitting) return;
@@ -299,8 +309,10 @@ export default function DodajZleceniePozostale() {
 			zl_regon: zlRegon || null,
 			zl_eori: zlEori || null,
 			zl_pesel: zlPesel || null,
-			pickup_date_start: !showPickupRange ? pickupDate : pickupRange[0],
-			pickup_date_end: !showPickupRange ? pickupDate : pickupRange[1],
+			pickup_date_start: !showPickupRange ? formatDate(pickupDate) : formatDate(pickupRange[0]),
+			pickup_date_end: !showPickupRange ? formatDate(pickupDate) : formatDate(pickupRange[1]),
+			delivery_date_start: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[0]),
+			delivery_date_end: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[1]),
 			delivery_date_start: !showDeliveryRange ? deliveryDate : deliveryRange[0],
 			delivery_date_end: !showDeliveryRange ? deliveryDate : deliveryRange[1],
 			export_customs_option: exportCustomsOption,
@@ -1267,15 +1279,17 @@ export default function DodajZleceniePozostale() {
 			<div className="flex flex-col items-center">
 			  <label className="text-sm mb-1 text-center">Waluta</label>
 			  <select
-				  className="px-3 py-1 border rounded w-20"
-				  style={{ textAlignLast: 'center' }}
-				  value={currency}
-				  onChange={(e) => setCurrency(e.target.value)}
+					className="px-3 py-1 border rounded w-20"
+					style={{ textAlignLast: 'center' }}
+					value={currency}
+					onChange={(e) => setCurrency(e.target.value)}
 				>
-				  <option value="EUR">EUR</option>
-				  <option value="PLN">PLN</option>
-				  <option value="CZ">CZ</option>
-				  <option value="inna">Inna</option>
+					{CURRENCIES.map((code) => (
+						<option key={code} value={code}>
+							{getCurrencySymbol(code)}
+						</option>
+					))}
+					<option value="inna">Inna</option>
 				</select>
 			</div>
 		  </div>

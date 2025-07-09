@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { getCurrencySymbol } from "../../utils/currency";
 
 export default function ListaZlecenImport() {
 	const navigate = useNavigate();
@@ -219,7 +220,7 @@ export default function ListaZlecenImport() {
 									})()}
 								</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{row.cena} {row.waluta}</td>
+                <td className="px-4 py-2 whitespace-nowrap">{row.cena} {getCurrencySymbol(row.waluta)}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.uwagi}</td>
               </tr>
             ))}
@@ -313,7 +314,7 @@ export default function ListaZlecenImport() {
 
 							<div>
 								<h3 className="font-semibold text-lg mb-1">Fracht i płatność</h3>
-								<p><strong>Cena:</strong> {selectedZlecenie.cena} {selectedZlecenie.waluta}</p>
+								<p><strong>Cena:</strong> {selectedZlecenie.cena} {getCurrencySymbol(selectedZlecenie.waluta)}</p>
 								<p><strong>Termin płatności:</strong> {selectedZlecenie.termin_dni} dni</p>
 								<p><strong>Wysłać e-mailem:</strong> {selectedZlecenie.wyslac_email ? "Tak" : "Nie"}</p>
 								<p><strong>Wysłać pocztą:</strong> {selectedZlecenie.wyslac_poczta ? "Tak" : "Nie"}</p>

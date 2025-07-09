@@ -49,6 +49,20 @@ export default function TransportTab() {
 		if (error) console.error(error);
 		else setPlanRows(data);
 	};
+	
+	const sortByDeliveryThenPickup = (a, b) => {
+		const deliveryA = a.delivery_date_start ? new Date(a.delivery_date_start) : new Date("2100-12-31");
+		const deliveryB = b.delivery_date_start ? new Date(b.delivery_date_start) : new Date("2100-12-31");
+
+		if (deliveryA.getTime() !== deliveryB.getTime()) {
+			return deliveryA - deliveryB;
+		}
+
+		const pickupA = a.pickup_date_start ? new Date(a.pickup_date_start) : new Date("2100-12-31");
+		const pickupB = b.pickup_date_start ? new Date(b.pickup_date_start) : new Date("2100-12-31");
+
+		return pickupA - pickupB;
+	};
 
 	const fetchOrders = async () => {
 		const { data: exportData } = await supabase
@@ -72,7 +86,7 @@ export default function TransportTab() {
 		const sortByPickupDate = (a, b) =>
 			new Date(a.pickup_date_start || "2100-12-31") - new Date(b.pickup_date_start || "2100-12-31");
 
-		setExportOrders((exportData || []).slice().sort(sortByDeliveryDate));
+		setExportOrders((exportData || []).slice().sort(sortByDeliveryThenPickup));
 		setImportOrders((importData || []).slice().sort(sortByPickupDate));
 		setPozostaleOrders((pozostaleData || []).slice().sort(sortByPickupDate));
 		
@@ -356,13 +370,44 @@ export default function TransportTab() {
 
 		return `${dayName} ${day}.${month}`;
 	}
+	
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		await fetchPlan();
+		setTimeout(() => {
+			setIsRefreshing(false);
+		}, 1000);
+	};
 
 	return (
 		<div className="flex gap-8 text-xs">
 			{/* LEWA TABELA */}
 			<div className="w-1/2">
 				<div className="flex items-center justify-between mb-2">
-					<div className="text-base font-bold">Plan Transportu</div>
+					<div className="flex items-center gap-2 text-base font-bold">
+						Plan Transportu
+						<button
+							onClick={handleRefresh}
+							className="flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-full text-xs shadow"
+						>
+							<svg
+								className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M4 4v6h6M20 20v-6h-6M4 20l4-4M20 4l-4 4"
+								/>
+							</svg>
+							Odśwież
+						</button>
+					</div>
 					<button
 						onClick={() => setShowPlanPanel(!showPlanPanel)}
 						className="bg-blue-500 text-white px-3 py-1 rounded text-xs"
@@ -646,8 +691,8 @@ export default function TransportTab() {
 															e.stopPropagation();
 															setContextMenu({
 																show: true,
-																x: e.clientX,
-																y: e.clientY,
+																x: e.pageX,
+																y: e.pageY,
 																index: idx,
 																type: "export"
 															});
@@ -670,8 +715,8 @@ export default function TransportTab() {
 															e.stopPropagation();
 															setContextMenu({
 																show: true,
-																x: e.clientX,
-																y: e.clientY,
+																x: e.pageX,
+																y: e.pageY,
 																index: idx,
 																type: "import"
 															});
@@ -720,32 +765,51 @@ export default function TransportTab() {
 					>
 						<button
 							className="block w-full text-left hover:bg-gray-100 px-2 py-1"
-							onClick={() => {
+							onClick={async () => {
 								if (!selectedRow) return;
 								if (contextMenu.index === null || contextMenu.index === undefined) return;
+
+								let numer = "";
 
 								if (contextMenu.type === "export") {
 									const ex = selectedRow.export?.[contextMenu.index];
 									if (!ex) return;
-
-									console.log("Szukam:", ex.numer);
-									console.log("Orders:", orders);
-
-									const found = orders.find(o => o.numer_zlecenia === ex.numer);
-									if (found) {
-										setSelectedOrder(found);
-										setShowModal(true);
-									}
+									numer = ex.numer;
 								} else if (contextMenu.type === "import") {
 									const imp = selectedRow.import?.[contextMenu.index];
 									if (!imp) return;
-
-									const found = orders.find(o => o.numer_zlecenia === imp.numer);
-									if (found) {
-										setSelectedOrder(found);
-										setShowModal(true);
-									}
+									numer = imp.numer;
 								}
+
+								console.log("Szukam numer:", numer);
+
+								const { data: foundExport } = await supabase
+									.from("zlecenia_export")
+									.select("*")
+									.eq("numer_zlecenia", numer)
+									.maybeSingle();
+
+								const { data: foundImport } = await supabase
+									.from("zlecenia_import")
+									.select("*")
+									.eq("numer_zlecenia", numer)
+									.maybeSingle();
+
+								const { data: foundPozostale } = await supabase
+									.from("zlecenia_pozostale")
+									.select("*")
+									.eq("numer_zlecenia", numer)
+									.maybeSingle();
+
+								const found = foundExport || foundImport || foundPozostale;
+
+								if (!found) {
+									alert("Nie znaleziono zlecenia w żadnej tabeli.");
+									return;
+								}
+
+								setSelectedOrder(found);
+								setShowModal(true);
 
 								setContextMenu({ show: false, x: 0, y: 0, index: null, type: null });
 							}}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { getCurrencySymbol } from "../../utils/currency";
 
 export default function ListaZlecenExport() {
   const navigate = useNavigate();
@@ -247,7 +248,7 @@ export default function ListaZlecenExport() {
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
-                  {row.cena} {row.waluta}
+                  {row.cena} {getCurrencySymbol(row.waluta)}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.uwagi}</td>
               </tr>
@@ -437,7 +438,7 @@ export default function ListaZlecenExport() {
                 </h3>
                 <p>
                   <strong>Cena:</strong> {selectedZlecenie.cena}{" "}
-                  {selectedZlecenie.waluta}
+                  {getCurrencySymbol(selectedZlecenie.waluta)}
                 </p>
                 <p>
                   <strong>Termin płatności:</strong>{" "}
