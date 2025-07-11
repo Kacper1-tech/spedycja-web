@@ -3,17 +3,21 @@ import { supabase } from "../../supabaseClient";
 import { getCurrencySymbol } from "../../utils/currency";
 
 export default function WykazExportLTL() {
+  console.log("🔥 Komponent WykazExportLTL się renderuje");
   const [rows, setRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [allSelected, setAllSelected] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
+      console.log("🔍 Startuje fetchData...");
       const { data, error } = await supabase
         .from("zlecenia_export")
         .select("*")
         .neq("ldm", "FTL")
         .order("delivery_date_start", { ascending: true });
+
+      console.log("Zlecenia z Supabase:", data);
 
       if (error) {
         console.error("Błąd ładowania danych:", error);
@@ -68,8 +72,7 @@ export default function WykazExportLTL() {
     window.print();
   };
 
-  const visibleRows =
-    selectedRows.length > 0 ? rows.filter((row) => selectedRows.includes(row.id)) : rows;
+  const visibleRows = rows;
 
   return (
     <div>
@@ -141,45 +144,52 @@ export default function WykazExportLTL() {
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row) => (
-              <tr
-                key={row.id}
-                className="hover:bg-gray-50 border-b border-gray-300"
-              >
-                <td className="px-4 py-2 text-center no-print">
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.includes(row.id)}
-                    onChange={() => handleSelectRow(row.id)}
-                  />
-                </td>
-                <td className="px-4 py-2 text-center">{row.zl_nazwa}</td>
-                <td className="px-4 py-2 text-center">
-                  {formatDate(row.pickup_date_start)}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {safeParse(row.adresy_odbioru_json)[0]?.miasto || "-"}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {row.export_customs_option === "adres"
-                    ? safeParse(row.export_customs_adres_json)?.miasto || "-"
-                    : "-"}
-                </td>
-                <td className="px-4 py-2 text-center">{row.palety || "-"}</td>
-                <td className="px-4 py-2 text-center">{row.wymiar || "-"}</td>
-                <td className="px-4 py-2 text-center">{row.ldm || "-"}</td>
-                <td className="px-4 py-2 text-center">{row.waga || "-"}</td>
-                <td className="px-4 py-2 text-center">
-                  {safeParse(row.adresy_dostawy_json)[0]?.kod || "-"}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {formatDate(row.delivery_date_start)}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {row.cena} {getCurrencySymbol(row.waluta)}
-                </td>
-              </tr>
-            ))}
+            {visibleRows.map((row) => {
+              console.log(row);
+              return (
+                <tr
+                  key={row.id}
+                  className="hover:bg-gray-50 border-b border-gray-300"
+                >
+                  <td className="px-4 py-2 text-center no-print">
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.includes(row.id)}
+                      onChange={() => handleSelectRow(row.id)}
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-center">{row.zl_nazwa}</td>
+                  <td className="px-4 py-2 text-center">
+                    {formatDate(row.pickup_date_start)}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {safeParse(row.adresy_odbioru_json)[0]?.miasto ||
+                      row.zl_miasto?.trim() || "-"}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {row.export_customs_option === "adres"
+                      ? safeParse(row.export_customs_adres_json)?.miasto || "-"
+                      : row.export_customs_option === "odbior"
+                      ? "Na zał"
+                      : "-"}
+                  </td>
+                  <td className="px-4 py-2 text-center">{row.palety || "-"}</td>
+                  <td className="px-4 py-2 text-center">{row.wymiar || "-"}</td>
+                  <td className="px-4 py-2 text-center">{row.ldm || "-"}</td>
+                  <td className="px-4 py-2 text-center">{row.waga || "-"}</td>
+                  <td className="px-4 py-2 text-center">
+                    {safeParse(row.adresy_dostawy_json)[0]?.kod ||
+                      row.zl_kod_pocztowy?.trim() || "-"}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {formatDate(row.delivery_date_start)}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {row.cena} {getCurrencySymbol(row.waluta)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
