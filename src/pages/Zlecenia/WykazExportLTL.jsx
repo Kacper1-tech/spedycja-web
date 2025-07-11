@@ -6,7 +6,7 @@ export default function WykazExportLTL() {
   console.log("🔥 Komponent WykazExportLTL się renderuje");
   const [rows, setRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
-  const [allSelected, setAllSelected] = useState(false);
+  const [allSelectedByWeek, setAllSelectedByWeek] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -15,7 +15,9 @@ export default function WykazExportLTL() {
         .from("zlecenia_export")
         .select("*")
         .neq("ldm", "FTL")
-        .order("delivery_date_start", { ascending: true });
+        .order("delivery_date_start", { ascending: true })
+        .order("pickup_date_start", { ascending: true })
+        .order("zl_nazwa", { ascending: true });
 
       console.log("Zlecenia z Supabase:", data);
 
@@ -50,149 +52,273 @@ export default function WykazExportLTL() {
     );
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAllForWeek = (weekNumber, rowsInWeek) => {
+    const allSelected = allSelectedByWeek[weekNumber] || false;
+
     if (allSelected) {
-      setSelectedRows([]);
-      setAllSelected(false);
+      // Odznacz tylko w tym tygodniu
+      const remaining = selectedRows.filter(
+        (id) => !rowsInWeek.some((row) => row.id === id)
+      );
+      setSelectedRows(remaining);
     } else {
-      const allIds = rows.map((row) => row.id);
-      setSelectedRows(allIds);
-      setAllSelected(true);
+      // Zaznacz tylko w tym tygodniu
+      const newIds = rowsInWeek.map((row) => row.id);
+      const unique = Array.from(new Set([...selectedRows, ...newIds]));
+      setSelectedRows(unique);
     }
+
+    setAllSelectedByWeek({
+      ...allSelectedByWeek,
+      [weekNumber]: !allSelected
+    });
   };
 
   const handleHideSelected = () => {
     const newRows = rows.filter((row) => !selectedRows.includes(row.id));
     setRows(newRows);
     setSelectedRows([]);
-    setAllSelected(false);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  function getWeekNumber(dateString) {
+    const date = new Date(dateString);
+    // Ustaw poniedziałek jako pierwszy dzień tygodnia
+    date.setHours(0, 0, 0, 0);
+    // Thursday in current week decides the year
+    date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+    const week1 = new Date(date.getFullYear(), 0, 4);
+    return (
+      1 +
+      Math.round(
+        ((date.getTime() - week1.getTime()) / 86400000 -
+          3 +
+          ((week1.getDay() + 6) % 7)) /
+          7
+      )
+    );
+  }
 
-  const visibleRows = rows;
+  const groupedRows = rows.reduce((acc, row) => {
+    const week = getWeekNumber(row.pickup_date_start) || 0;
+    if (!acc[week]) {
+      acc[week] = [];
+    }
+    acc[week].push(row);
+    return acc;
+  }, {});
+
+  const handlePrintForWeek = (weekNumber) => {
+    const rowsInWeek = groupedRows[weekNumber];
+
+    const html = `
+      <html>
+        <head>
+          <title>Wykaz LTL - Tydzień ${weekNumber}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12pt;
+            }
+            th, td {
+              border: 1px solid #333;
+              padding: 8px 12px;
+              text-align: center;
+            }
+            th {
+              background-color: #f0f0f0;
+            }
+            tr:nth-child(even) {
+              background-color: #fafafa;
+            }
+
+            /* ✅ Szerokości kolumn w % */
+            th:nth-child(1), td:nth-child(1) { width: 12%; }
+            th:nth-child(2), td:nth-child(2) { width: 9%; }
+            th:nth-child(3), td:nth-child(3) { width: 10%; }
+            th:nth-child(4), td:nth-child(4) { width: 7%; }
+            th:nth-child(5), td:nth-child(5) { width: 3%; }
+            th:nth-child(6), td:nth-child(6) { width: 20%; }
+            th:nth-child(7), td:nth-child(7) { width: 5%; }
+            th:nth-child(8), td:nth-child(8) { width: 7%; }
+            th:nth-child(9), td:nth-child(9) { width: 10%; }
+            th:nth-child(10), td:nth-child(10) { width: 9%; }
+            th:nth-child(11), td:nth-child(11) { width: 8%; }
+          </style>
+        </head>
+        <body>
+          <h1>Wykaz LTL - Tydzień ${weekNumber}</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Zleceniodawca</th>
+                <th>Data załadunku</th>
+                <th>Adres załadunku</th>
+                <th>Cło</th>
+                <th>Ilość palet</th>
+                <th>Wymiar</th>
+                <th>LDM</th>
+                <th>Waga</th>
+                <th>Adres rozładunku</th>
+                <th>Data rozładunku</th>
+                <th>Cena</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsInWeek.map(row => `
+                <tr>
+                  <td>${row.zl_nazwa}</td>
+                  <td>${formatDate(row.pickup_date_start)}</td>
+                  <td>${safeParse(row.adresy_odbioru_json)[0]?.miasto || row.zl_miasto || "-"}</td>
+                  <td>${row.export_customs_option === "adres"
+                    ? (safeParse(row.export_customs_adres_json)?.miasto || "-")
+                    : row.export_customs_option === "odbior"
+                    ? "Na zał"
+                    : "-"}</td>
+                  <td>${row.palety || "-"}</td>
+                  <td>${row.wymiar || "-"}</td>
+                  <td>${row.ldm || "-"}</td>
+                  <td>${row.waga || "-"}</td>
+                  <td>${safeParse(row.adresy_dostawy_json)[0]?.kod || row.zl_kod_pocztowy || "-"}</td>
+                  <td>${formatDate(row.delivery_date_start)}</td>
+                  <td>${row.cena} ${getCurrencySymbol(row.waluta)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "", "width=1024,height=768");
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
 
   return (
     <div>
       <style>{`
-        @media print {
           @page {
             size: A3 landscape;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #printableTable, #printableTable * {
-            visibility: visible;
-          }
-          #printableTable {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
       `}</style>
 
       <h1 className="text-2xl font-bold mb-4 no-print">Wykaz LTL - Export</h1>
 
-      <div className="no-print mb-4">
-        {selectedRows.length > 0 && (
-          <button
-            className="mr-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            onClick={handleHideSelected}
-          >
-            Ukryj zaznaczone ({selectedRows.length})
-          </button>
-        )}
+      {Object.entries(groupedRows).map(([weekNumber, rowsInWeek]) => (
+        <div key={weekNumber} className="mb-12">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">
+              Tydzień {weekNumber}
+            </h2>
 
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={handlePrint}
-        >
-          Drukuj {selectedRows.length > 0 ? "zaznaczone" : "wszystkie"}
-        </button>
-      </div>
+            <div className="no-print flex gap-4">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => handlePrintForWeek(weekNumber)}
+              >
+                Drukuj tydzień {weekNumber}
+              </button>
 
-      <div id="printableTable" className="overflow-x-auto rounded-lg shadow border border-gray-200">
-        <table className="min-w-full text-sm text-left text-gray-800">
-          <thead className="bg-gray-100 text-xs uppercase font-semibold tracking-wide">
-            <tr>
-              <th className="px-4 py-3 text-center no-print">
-                <input
-                  type="checkbox"
-                  onChange={handleSelectAll}
-                  checked={allSelected}
-                />
-              </th>
-              <th className="px-4 py-3 text-center">Zleceniodawca</th>
-              <th className="px-4 py-3 text-center">Data załadunku</th>
-              <th className="px-4 py-3 text-center">Adres załadunku</th>
-              <th className="px-4 py-3 text-center">Cło</th>
-              <th className="px-4 py-3 text-center">Ilość palet</th>
-              <th className="px-4 py-3 text-center">Wymiar</th>
-              <th className="px-4 py-3 text-center">LDM</th>
-              <th className="px-4 py-3 text-center">Waga</th>
-              <th className="px-4 py-3 text-center">Adres rozładunku</th>
-              <th className="px-4 py-3 text-center">Data rozładunku</th>
-              <th className="px-4 py-3 text-center">Cena</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => {
-              console.log(row);
-              return (
-                <tr
-                  key={row.id}
-                  className="hover:bg-gray-50 border-b border-gray-300"
+              {selectedRows.length > 0 && (
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={handleHideSelected}
                 >
-                  <td className="px-4 py-2 text-center no-print">
+                  Ukryj zaznaczone ({selectedRows.length})
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 🔵 Unikalny ID dla tego tygodnia */}
+          <div
+            id={`printableTable-${weekNumber}`}
+            className="overflow-x-auto rounded-lg shadow border border-gray-200"
+          >
+            <table className="min-w-full text-sm text-left text-gray-800">
+              <thead className="bg-gray-100 text-xs uppercase font-semibold tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-center">
                     <input
                       type="checkbox"
-                      checked={selectedRows.includes(row.id)}
-                      onChange={() => handleSelectRow(row.id)}
+                      className="no-print"
+                      onChange={() => handleSelectAllForWeek(weekNumber, rowsInWeek)}
+                      checked={allSelectedByWeek[weekNumber] || false}
                     />
-                  </td>
-                  <td className="px-4 py-2 text-center">{row.zl_nazwa}</td>
-                  <td className="px-4 py-2 text-center">
-                    {formatDate(row.pickup_date_start)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {safeParse(row.adresy_odbioru_json)[0]?.miasto ||
-                      row.zl_miasto?.trim() || "-"}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {row.export_customs_option === "adres"
-                      ? safeParse(row.export_customs_adres_json)?.miasto || "-"
-                      : row.export_customs_option === "odbior"
-                      ? "Na zał"
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-2 text-center">{row.palety || "-"}</td>
-                  <td className="px-4 py-2 text-center">{row.wymiar || "-"}</td>
-                  <td className="px-4 py-2 text-center">{row.ldm || "-"}</td>
-                  <td className="px-4 py-2 text-center">{row.waga || "-"}</td>
-                  <td className="px-4 py-2 text-center">
-                    {safeParse(row.adresy_dostawy_json)[0]?.kod ||
-                      row.zl_kod_pocztowy?.trim() || "-"}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {formatDate(row.delivery_date_start)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {row.cena} {getCurrencySymbol(row.waluta)}
-                  </td>
+                  </th>
+                  <th className="px-4 py-3 text-center">Zleceniodawca</th>
+                  <th className="px-4 py-3 text-center">Data załadunku</th>
+                  <th className="px-4 py-3 text-center">Adres załadunku</th>
+                  <th className="px-4 py-3 text-center">Cło</th>
+                  <th className="px-4 py-3 text-center">Ilość palet</th>
+                  <th className="px-4 py-3 text-center">Wymiar</th>
+                  <th className="px-4 py-3 text-center">LDM</th>
+                  <th className="px-4 py-3 text-center">Waga</th>
+                  <th className="px-4 py-3 text-center">Adres rozładunku</th>
+                  <th className="px-4 py-3 text-center">Data rozładunku</th>
+                  <th className="px-4 py-3 text-center">Cena</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+
+              <tbody>
+                {rowsInWeek.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={`hover:bg-gray-50 border-b border-gray-300 ${
+                      selectedRows.includes(row.id) ? "selected" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        className="no-print"
+                        checked={selectedRows.includes(row.id)}
+                        onChange={() => handleSelectRow(row.id)}
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-center">{row.zl_nazwa}</td>
+                    <td className="px-4 py-2 text-center">
+                      {formatDate(row.pickup_date_start)}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {safeParse(row.adresy_odbioru_json)[0]?.miasto ||
+                        row.zl_miasto?.trim() || "-"}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {row.export_customs_option === "adres"
+                        ? safeParse(row.export_customs_adres_json)?.miasto || "-"
+                        : row.export_customs_option === "odbior"
+                        ? "Na zał"
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-2 text-center">{row.palety || "-"}</td>
+                    <td className="px-4 py-2 text-center">{row.wymiar || "-"}</td>
+                    <td className="px-4 py-2 text-center">{row.ldm || "-"}</td>
+                    <td className="px-4 py-2 text-center">{row.waga || "-"}</td>
+                    <td className="px-4 py-2 text-center">
+                      {safeParse(row.adresy_dostawy_json)[0]?.kod ||
+                        row.zl_kod_pocztowy?.trim() || "-"}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {formatDate(row.delivery_date_start)}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {row.cena} {getCurrencySymbol(row.waluta)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

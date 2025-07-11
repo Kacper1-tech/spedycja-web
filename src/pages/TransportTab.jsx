@@ -3,6 +3,10 @@ import { supabase } from "../supabaseClient";
 import React from "react";
 import { getCurrencySymbol } from "../utils/currency";
 
+const safeParse = (val) => {
+  try { return JSON.parse(val || "[]"); } catch { return []; }
+};
+
 export default function TransportTab() {
   const [planRows, setPlanRows] = useState([]); // lewa tabela
   const [setOrders] = useState([]); // prawa tabela
@@ -933,30 +937,11 @@ export default function TransportTab() {
 								<td className="border p-2 text-center">{o.ldm}</td>
 								<td className="border p-2 text-center">{o.waga}</td>
 								<td className="border p-2 text-center">
-									{(() => {
-									try {
-										if (o.adresy_odbioru_json) {
-										const parsed = JSON.parse(o.adresy_odbioru_json);
-										return parsed[0]?.kod || "-";
-										}
-									} catch {
-										return "-";
-									}
-									return "-";
-									})()}
+									{safeParse(o.adresy_odbioru_json)[0]?.kod || o.zl_kod_pocztowy?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">
-									{(() => {
-									try {
-										if (o.adresy_dostawy_json) {
-										const parsed = JSON.parse(o.adresy_dostawy_json);
-										return parsed[0]?.kod || "-";
-										}
-									} catch {
-										return "-";
-									}
-									return "-";
-									})()}
+									{safeParse(o.adresy_dostawy_json)[0]?.kod ||
+									o.zl_kod_rozladunku?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
 								<td className="border p-2 text-center">
@@ -988,10 +973,10 @@ export default function TransportTab() {
 								<td className="border p-2 text-center">{o.ldm}</td>
 								<td className="border p-2 text-center">{o.waga}</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
+									{safeParse(o.adresy_odbioru_json)[0]?.kod || o.zl_kod_pocztowy?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
+									{safeParse(o.adresy_dostawy_json)[0]?.kod || o.zl_kod_pocztowy?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
 								<td className="border p-2 text-center">
@@ -1024,10 +1009,10 @@ export default function TransportTab() {
 								<td className="border p-2 text-center">{o.ldm}</td>
 								<td className="border p-2 text-center">{o.waga}</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
+									{safeParse(o.adresy_odbioru_json)[0]?.kod || o.zl_kod_pocztowy?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
+									{safeParse(o.adresy_dostawy_json)[0]?.kod || o.zl_kod_pocztowy?.trim() || "-"}
 								</td>
 								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
 								<td className="border p-2 text-center">

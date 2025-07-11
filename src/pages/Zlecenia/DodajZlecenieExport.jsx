@@ -65,6 +65,7 @@ export default function DodajZlecenieExport() {
 	const [pickupSuggestions, setPickupSuggestions] = useState([[]]);
 	const [deliverySuggestions, setDeliverySuggestions] = useState([[]]);
 	const [contactSuggestions, setContactSuggestions] = useState([]);
+	const [originalZlecenie, setOriginalZlecenie] = useState({});
 
 	
 		// ⬇️ TUTAJ WKLEJ
@@ -83,6 +84,8 @@ export default function DodajZlecenieExport() {
 				alert("Nie udało się załadować zlecenia.");
 				return;
 			}
+
+			setOriginalZlecenie(data);
 
 			// Ustaw wszystkie stany formularza na podstawie danych z Supabase
 			setNumerZlecenia(data.numer_zlecenia || "");
@@ -296,41 +299,60 @@ export default function DodajZlecenieExport() {
 
 		// 🔑 2️⃣ Dopiero teraz budujesz payload — z kontrahent_id
 		const payload = {
-			numer_zlecenia: numerZlecenia,
-			osoba_kontaktowa: osobaKontaktowa,
-			telefon_kontaktowy: telefonKontaktowy,
-			email_kontaktowy: emailKontaktowy,
-			zl_nazwa: zlNazwa,
-			zl_ulica: zlUlica,
-			zl_miasto: zlMiasto,
-			zl_kod_pocztowy: zlKodPocztowy,
-			zl_panstwo: zlPanstwo,
-			zl_vat: vat || null,
-			zl_nip: zlNip || null,
-			zl_regon: zlRegon || null,
-			zl_eori: zlEori || null,
-			zl_pesel: zlPesel || null,
+			numer_zlecenia: numerZlecenia || originalZlecenie.numer_zlecenia,
+			osoba_kontaktowa: osobaKontaktowa || originalZlecenie.osoba_kontaktowa,
+			telefon_kontaktowy: telefonKontaktowy || originalZlecenie.telefon_kontaktowy,
+			email_kontaktowy: emailKontaktowy || originalZlecenie.email_kontaktowy,
+
+			zl_nazwa: zlNazwa || originalZlecenie.zl_nazwa,
+			zl_ulica: zlUlica || originalZlecenie.zl_ulica,
+			zl_miasto: zlMiasto || originalZlecenie.zl_miasto,
+			zl_kod_pocztowy: zlKodPocztowy || originalZlecenie.zl_kod_pocztowy,
+			zl_panstwo: zlPanstwo || originalZlecenie.zl_panstwo,
+			zl_vat: vat || originalZlecenie.zl_vat,
+			zl_nip: zlNip || originalZlecenie.zl_nip,
+			zl_regon: zlRegon || originalZlecenie.zl_regon,
+			zl_eori: zlEori || originalZlecenie.zl_eori,
+			zl_pesel: zlPesel || originalZlecenie.zl_pesel,
+
 			pickup_date_start: !showPickupRange ? formatDate(pickupDate) : formatDate(pickupRange[0]),
 			pickup_date_end: !showPickupRange ? formatDate(pickupDate) : formatDate(pickupRange[1]),
 			delivery_date_start: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[0]),
 			delivery_date_end: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[1]),
-			export_customs_option: exportCustomsOption,
-			export_customs_adres_json: exportCustomsOption === "adres" ? JSON.stringify(exportCustomsAddress) : null,
-			import_customs_option: importCustomsOption,
-			import_customs_adres_json: importCustomsOption === "adres" ? JSON.stringify(importCustomsAddress) : null,
-			waluta: currency,
-			custom_currency: customCurrency || null,
-			termin_dni: paymentDays ? parseInt(paymentDays) : null,
+
+			export_customs_option: exportCustomsOption || originalZlecenie.export_customs_option,
+			export_customs_adres_json: exportCustomsOption === "adres"
+				? JSON.stringify(exportCustomsAddress)
+				: originalZlecenie.export_customs_adres_json,
+
+			import_customs_option: importCustomsOption || originalZlecenie.import_customs_option,
+			import_customs_adres_json: importCustomsOption === "adres"
+				? JSON.stringify(importCustomsAddress)
+				: originalZlecenie.import_customs_adres_json,
+
+			waluta: currency || originalZlecenie.waluta,
+			custom_currency: customCurrency || originalZlecenie.custom_currency,
+			termin_dni: paymentDays ? parseInt(paymentDays) : originalZlecenie.termin_dni,
 			wyslac_email: sendEmail,
 			wyslac_poczta: sendPost,
-			adresy_odbioru_json: JSON.stringify(pickupAddresses),
-			adresy_dostawy_json: JSON.stringify(deliveryAddresses),
-			palety: palety || null,
-			waga: waga || null,
-			wymiar: wymiar || null,
-			ldm: ldm || null,
-			cena: cena || null,
-			uwagi: uwagi || null,
+
+			adresy_odbioru_json:
+				pickupAddresses?.length && pickupAddresses[0]?.nazwa
+				? JSON.stringify(pickupAddresses)
+				: originalZlecenie.adresy_odbioru_json,
+
+			adresy_dostawy_json:
+				deliveryAddresses?.length && deliveryAddresses[0]?.nazwa
+				? JSON.stringify(deliveryAddresses)
+				: originalZlecenie.adresy_dostawy_json,
+
+			palety: palety || originalZlecenie.palety,
+			waga: waga || originalZlecenie.waga,
+			wymiar: wymiar || originalZlecenie.wymiar,
+			ldm: ldm || originalZlecenie.ldm,
+			cena: cena || originalZlecenie.cena,
+			uwagi: uwagi || originalZlecenie.uwagi,
+
 			pickup_time: !pickupTimeIsRange ? pickupTime : null,
 			pickup_time_start: pickupTimeIsRange ? pickupTimeRange[0] : null,
 			pickup_time_end: pickupTimeIsRange ? pickupTimeRange[1] : null,
@@ -338,6 +360,7 @@ export default function DodajZlecenieExport() {
 			delivery_time: !deliveryTimeIsRange ? deliveryTime : null,
 			delivery_time_start: deliveryTimeIsRange ? deliveryTimeRange[0] : null,
 			delivery_time_end: deliveryTimeIsRange ? deliveryTimeRange[1] : null,
+
 			kontrahent_id: kontrahentIdNowy || kontrahentId
 		};
 
