@@ -25,7 +25,7 @@ export default function DodajFaktureKosztowa() {
 		};
 
 		// Wyślij do Supabase
-		const { data, error } = await supabase
+		const { error } = await supabase
 			.from("faktury_kosztowe")
 			.insert([newInvoice]);
 

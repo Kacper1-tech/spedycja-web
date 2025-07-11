@@ -2,7 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { FaAngleRight } from "react-icons/fa";
 import { supabase } from "../supabaseClient";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 export default function NavigationBar() {
   const location = useLocation();
@@ -10,12 +9,10 @@ export default function NavigationBar() {
   const isExportActive = path.startsWith("/zlecenia/export");
   const isImportActive = path.startsWith("/zlecenia/import");
   const isOtherActive = path.startsWith("/zlecenia/pozostale");
-	const isAccountingActive = path.startsWith("/ksiegowosc");
 
   const [isZleceniaOpen, setZleceniaOpen] = useState(false);
 	const [isKsiegowoscOpen, setKsiegowoscOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState(null);
-	const isKontrahenciActive = path.startsWith("/kontrahenci");
 	const [isKontrahenciOpen, setKontrahenciOpen] = useState(false);
 
   return (

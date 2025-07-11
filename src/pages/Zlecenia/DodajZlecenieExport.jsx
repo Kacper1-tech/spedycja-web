@@ -62,6 +62,9 @@ export default function DodajZlecenieExport() {
 	const [pickupTimeIsRange, setPickupTimeIsRange] = useState(false);
 	const [deliveryDateIsRange, setDeliveryDateIsRange] = useState(false);
 	const [deliveryTimeIsRange, setDeliveryTimeIsRange] = useState(false);
+	const [pickupSuggestions, setPickupSuggestions] = useState([[]]);
+	const [deliverySuggestions, setDeliverySuggestions] = useState([[]]);
+	const [contactSuggestions, setContactSuggestions] = useState([]);
 
 	
 		// ⬇️ TUTAJ WKLEJ
@@ -311,8 +314,6 @@ export default function DodajZlecenieExport() {
 			pickup_date_end: !showPickupRange ? formatDate(pickupDate) : formatDate(pickupRange[1]),
 			delivery_date_start: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[0]),
 			delivery_date_end: !showDeliveryRange ? formatDate(deliveryDate) : formatDate(deliveryRange[1]),
-			delivery_date_start: !showDeliveryRange ? deliveryDate : deliveryRange[0],
-			delivery_date_end: !showDeliveryRange ? deliveryDate : deliveryRange[1],
 			export_customs_option: exportCustomsOption,
 			export_customs_adres_json: exportCustomsOption === "adres" ? JSON.stringify(exportCustomsAddress) : null,
 			import_customs_option: importCustomsOption,
@@ -337,7 +338,7 @@ export default function DodajZlecenieExport() {
 			delivery_time: !deliveryTimeIsRange ? deliveryTime : null,
 			delivery_time_start: deliveryTimeIsRange ? deliveryTimeRange[0] : null,
 			delivery_time_end: deliveryTimeIsRange ? deliveryTimeRange[1] : null,
-			kontrahent_id: kontrahentIdNowy // 💥 TO JEST KLUCZ
+			kontrahent_id: kontrahentIdNowy || kontrahentId
 		};
 
 		// 🔑 3️⃣ INSERT lub UPDATE
@@ -365,6 +366,40 @@ export default function DodajZlecenieExport() {
 				setIsSubmitting(false);
 				return;
 			}
+		}
+		
+		
+		// ➜ ZAPISZ adresy i kontakty (krok 2)
+		for (const addr of pickupAddresses) {
+			if (addr.nazwa) {
+				await supabase.from("saved_addresses").upsert({
+					name: addr.nazwa,
+					street: addr.ulica,
+					postal_code: addr.kod,
+					city: addr.miasto,
+					country: addr.panstwo
+				}, { onConflict: ["name", "street", "postal_code"] });
+			}
+		}
+
+		for (const addr of deliveryAddresses) {
+			if (addr.nazwa) {
+				await supabase.from("saved_addresses").upsert({
+					name: addr.nazwa,
+					street: addr.ulica,
+					postal_code: addr.kod,
+					city: addr.miasto,
+					country: addr.panstwo
+				}, { onConflict: ["name", "street", "postal_code"] });
+			}
+		}
+
+		if (osobaKontaktowa) {
+			await supabase.from("saved_contacts").upsert({
+				name: osobaKontaktowa,
+				phone: telefonKontaktowy,
+				email: emailKontaktowy
+			}, { onConflict: ["name", "phone"] });
 		}
 		
 		// Jeśli LDM to nie FTL — kopiujemy do wykaz_ltl
@@ -446,6 +481,147 @@ export default function DodajZlecenieExport() {
       setPickupAddresses([...pickupAddresses, {}]);
     }
   };
+	
+	const handlePickupAddressNameChange = async (e, index) => {
+		const value = e.target.value;
+		const updated = [...pickupAddresses];
+		updated[index] = { ...updated[index], nazwa: value };
+		setPickupAddresses(updated);
+
+		console.log("🔵 [handlePickupAddressNameChange] value:", value);
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("saved_addresses")
+				.select("*")
+				.ilike("name", `${value}%`)
+				.limit(5);
+
+			console.log("🟢 [handlePickupAddressNameChange] data:", data);
+			console.log("🔴 [handlePickupAddressNameChange] error:", error);
+
+			const updatedSuggestions = [...pickupSuggestions];
+			updatedSuggestions[index] = data || [];
+			setPickupSuggestions(updatedSuggestions);
+		} else {
+			const updatedSuggestions = [...pickupSuggestions];
+			updatedSuggestions[index] = [];
+			setPickupSuggestions(updatedSuggestions);
+		}
+	};
+
+	const selectPickupSuggestion = (addr, index) => {
+		console.log("✅ SELECTED PICKUP:", addr);
+		const updated = [...pickupAddresses];
+		updated[index] = {
+			...updated[index],
+			nazwa: addr.name,
+			ulica: addr.street,
+			kod: addr.postal_code,
+			miasto: addr.city,
+			panstwo: addr.country
+		};
+		setPickupAddresses(updated);
+
+		const updatedSuggestions = [...pickupSuggestions];
+		updatedSuggestions[index] = [];
+		setPickupSuggestions(updatedSuggestions);
+	};
+	
+	const handleDeliveryAddressNameChange = async (e, index) => {
+		const value = e.target.value;
+
+		const updated = [...deliveryAddresses];
+		updated[index] = { ...updated[index], nazwa: value };
+		setDeliveryAddresses(updated);
+
+		console.log("🔵 [handleDeliveryAddressNameChange] value:", value);
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("saved_addresses")
+				.select("*")
+				.ilike("name", `${value}%`)
+				.limit(5);
+
+			console.log("🟢 [handleDeliveryAddressNameChange] data:", data);
+			console.log("🔴 [handleDeliveryAddressNameChange] error:", error);
+
+			const updatedDelivery = [...deliverySuggestions];
+			updatedDelivery[index] = data || [];
+			setDeliverySuggestions(updatedDelivery);
+		} else {
+			const updatedDelivery = [...deliverySuggestions];
+			updatedDelivery[index] = [];
+			setDeliverySuggestions(updatedDelivery);
+		}
+	};
+
+	const selectDeliverySuggestion = (addr, index) => {
+		console.log("✅ SELECTED DELIVERY:", addr);
+		const updated = [...deliveryAddresses];
+		updated[index] = {
+			...updated[index],
+			nazwa: addr.name,
+			ulica: addr.street,
+			kod: addr.postal_code,
+			miasto: addr.city,
+			panstwo: addr.country
+		};
+		setDeliveryAddresses(updated);
+
+		const updatedSuggestions = [...deliverySuggestions];
+		updatedSuggestions[index] = [];
+		setDeliverySuggestions(updatedSuggestions);
+	};
+	
+	const handleContactNameChange = async (e) => {
+		const value = e.target.value;
+		setOsobaKontaktowa(value);
+
+		if (value.length >= 2) {
+			const { data, error } = await supabase
+				.from("kontrahenci")
+				.select("id, kontakty_json")
+				.not("kontakty_json", "is", null);
+
+			if (error) {
+				console.error("❌ Supabase error:", error);
+				return;
+			}
+
+			// Rozpakuj wszystkie kontakty
+			let allContacts = [];
+			data.forEach((k) => {
+				if (Array.isArray(k.kontakty_json)) {
+					allContacts.push(...k.kontakty_json);
+				}
+			});
+
+			// Filtrowanie po imieniu
+			const suggestions = allContacts.filter((contact) =>
+				contact.imie_nazwisko?.toLowerCase().startsWith(value.toLowerCase())
+			);
+			console.log("💡 Wszystkie kontakty:", allContacts);
+			console.log("💡 Wpisane:", value);
+			console.log("💡 Dopasowane:", suggestions);
+			console.log("✅ CONTACT SUGGESTIONS:", suggestions);
+
+			setContactSuggestions(suggestions);
+		} else {
+			setContactSuggestions([]);
+		}
+	};
+
+	const selectContactSuggestion = (contact) => {
+		console.log("✅ SELECTED CONTACT:", contact);
+
+		setOsobaKontaktowa(contact.imie_nazwisko);
+		setTelefonKontaktowy(contact.telefon);
+		setEmailKontaktowy(contact.email);
+
+		setContactSuggestions([]);
+	};
 
   const addDeliveryAddress = () => {
     if (deliveryAddresses.length < 10) {
@@ -579,14 +755,27 @@ export default function DodajZlecenieExport() {
 			{/* Osoba kontaktowa */}
 			<div className="flex-1 flex flex-col items-center">
 				<label className="mb-2 font-medium text-center">Osoba kontaktowa zleceniodawcy</label>
-				<div className="w-full space-y-2">
+				<div className="w-full space-y-2 relative">
 					<input
 						type="text"
 						placeholder="Imię i nazwisko"
 						className="w-full px-3 py-1 border rounded"
 						value={osobaKontaktowa}
-						onChange={(e) => setOsobaKontaktowa(e.target.value)}
+						onChange={handleContactNameChange}
 					/>
+					{contactSuggestions.length > 0 && (
+						<ul className="absolute bg-white border w-full z-50">
+							{contactSuggestions.map((sug) => (
+								<li
+									key={`${sug.imie_nazwisko}-${sug.telefon}`}
+									className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+									onClick={() => selectContactSuggestion(sug)}
+								>
+									{sug.imie_nazwisko}
+								</li>
+							))}
+						</ul>
+					)}
 					<div className="flex gap-4">
 						<input
 							type="tel"
@@ -866,18 +1055,27 @@ export default function DodajZlecenieExport() {
 						<h2 className="font-semibold text-center mb-2">Adres odbioru towaru</h2>
 						<div className="space-y-4">
 							{pickupAddresses.map((address, index) => (
-								<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
+								<div key={index} className="relative flex flex-col items-center space-y-2 border-b pb-2">
 									<input
 										type="text"
 										placeholder="Nazwa firmy"
 										className="w-full px-3 py-1 border rounded"
 										value={address.nazwa || ""}
-										onChange={(e) => {
-											const updated = [...pickupAddresses];
-											updated[index] = { ...updated[index], nazwa: e.target.value };
-											setPickupAddresses(updated);
-										}}
+										onChange={(e) => handlePickupAddressNameChange(e, index)}
 									/>
+									{pickupSuggestions[index]?.length > 0 && (
+										<ul className="absolute bg-white border w-full z-50">
+											{pickupSuggestions[index].map((sug) => (
+												<li
+													key={`${sug.name}-${sug.postal_code}`}
+													className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+													onClick={() => selectPickupSuggestion(sug, index)}
+												>
+													{sug.name}
+												</li>
+											))}
+										</ul>
+									)}
 									<input
 										type="text"
 										placeholder="Ulica i nr budynku"
@@ -942,18 +1140,27 @@ export default function DodajZlecenieExport() {
 						<h2 className="font-semibold text-center mb-2">Adres dostawy towaru</h2>
 						<div className="space-y-4">
 							{deliveryAddresses.map((address, index) => (
-								<div key={index} className="flex flex-col items-center space-y-2 border-b pb-2">
+								<div key={index} className="relative flex flex-col items-center space-y-2 border-b pb-2">
 									<input
 										type="text"
 										placeholder="Nazwa firmy"
 										className="w-full px-3 py-1 border rounded"
 										value={address.nazwa || ""}
-										onChange={(e) => {
-											const updated = [...deliveryAddresses];
-											updated[index] = { ...updated[index], nazwa: e.target.value };
-											setDeliveryAddresses(updated);
-										}}
+										onChange={(e) => handleDeliveryAddressNameChange(e, index)}
 									/>
+									{deliverySuggestions[index]?.length > 0 && (
+										<ul className="absolute bg-white border w-full z-50">
+											{deliverySuggestions[index].map((sug) => (
+												<li
+													key={`${sug.name}-${sug.postal_code}`}
+													className="px-3 py-2 hover:bg-gray-200 cursor-pointer"
+													onClick={() => selectDeliverySuggestion(sug, index)}
+												>
+													{sug.name}
+												</li>
+											))}
+										</ul>
+									)}
 									<input
 										type="text"
 										placeholder="Ulica i nr budynku"

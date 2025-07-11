@@ -87,12 +87,13 @@ export default function ListaZlecenImport() {
           } else if (key === "delivery_date") {
             cell = formatDateRange(row.delivery_date_start, row.delivery_date_end);
 					} else if (key === "pickup_address") {
-						const parsed = safeParseArray(row.adresy_odbioru_json);
-						cell = Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
+						const a = safeParseArray(row.adresy_odbioru_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
 					} else if (key === "delivery_address") {
-						const parsed = safeParseArray(row.adresy_dostawy_json);
-						cell = Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
-          } else if (key === "identyfikator") {
+						const a = safeParseArray(row.adresy_dostawy_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+					} 
+						else if (key === "identyfikator") {
             cell = row.zl_vat || row.zl_nip || row.zl_regon || row.zl_eori || row.zl_pesel || "-";
           } else {
             cell = row[key] || "";
@@ -208,15 +209,15 @@ export default function ListaZlecenImport() {
                 <td className="px-4 py-2 whitespace-nowrap">{row.delivery_time || (row.delivery_time_start && `${row.delivery_time_start} – ${row.delivery_time_end}`) || "-"}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
 									{(() => {
-										const parsed = safeParseArray(row.adresy_odbioru_json);
-										return Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
+										const a = safeParseArray(row.adresy_odbioru_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
 									})()}
 								</td>
 
 								<td className="px-4 py-2 whitespace-nowrap">
 									{(() => {
-										const parsed = safeParseArray(row.adresy_dostawy_json);
-										return Array.isArray(parsed) && parsed[0]?.nazwa ? parsed[0].nazwa : "-";
+										const a = safeParseArray(row.adresy_dostawy_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
 									})()}
 								</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>

@@ -87,10 +87,13 @@ export default function ListaZlecenPozostale() {
           } else if (key === "delivery_date") {
             cell = formatDateRange(row.delivery_date_start, row.delivery_date_end);
           } else if (key === "pickup_address") {
-            cell = safeParseArray(row.adresy_odbioru_json)[0]?.nazwa || "-";
-          } else if (key === "delivery_address") {
-            cell = safeParseArray(row.adresy_dostawy_json)[0]?.nazwa || "-";
-          } else if (key === "identyfikator") {
+						const a = safeParseArray(row.adresy_odbioru_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+					} else if (key === "delivery_address") {
+						const a = safeParseArray(row.adresy_dostawy_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+					} 
+						else if (key === "identyfikator") {
             cell = row.zl_vat || row.zl_nip || row.zl_regon || row.zl_eori || row.zl_pesel || "-";
           } else {
             cell = row[key] || "";
@@ -204,8 +207,19 @@ export default function ListaZlecenPozostale() {
                 <td className="px-4 py-2 whitespace-nowrap">{row.pickup_time || (row.pickup_time_start && `${row.pickup_time_start} – ${row.pickup_time_end}`) || "-"}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{formatDateRange(row.delivery_date_start, row.delivery_date_end)}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.delivery_time || (row.delivery_time_start && `${row.delivery_time_start} – ${row.delivery_time_end}`) || "-"}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{safeParseArray(row.adresy_odbioru_json)[0]?.nazwa || "-"}</td>
-                <td className="px-4 py-2 whitespace-nowrap">{safeParseArray(row.adresy_dostawy_json)[0]?.nazwa || "-"}</td>
+                <td className="px-4 py-2 whitespace-nowrap">
+									{(() => {
+										const a = safeParseArray(row.adresy_odbioru_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+									})()}
+								</td>
+
+								<td className="px-4 py-2 whitespace-nowrap">
+									{(() => {
+										const a = safeParseArray(row.adresy_dostawy_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+									})()}
+								</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.cena} {getCurrencySymbol(row.waluta)}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.uwagi}</td>
@@ -301,7 +315,7 @@ export default function ListaZlecenPozostale() {
 
 							<div>
 								<h3 className="font-semibold text-lg mb-1">Fracht i płatność</h3>
-								<p><strong>Cena:</strong> {selectedZlecenie.cena} {getCurrencySymbol(selectedZlecenie.waluta)}}</p>
+								<p><strong>Cena:</strong> {selectedZlecenie.cena} {getCurrencySymbol(selectedZlecenie.waluta)}</p>
 								<p><strong>Termin płatności:</strong> {selectedZlecenie.termin_dni} dni</p>
 								<p><strong>Wysłać e-mailem:</strong> {selectedZlecenie.wyslac_email ? "Tak" : "Nie"}</p>
 								<p><strong>Wysłać pocztą:</strong> {selectedZlecenie.wyslac_poczta ? "Tak" : "Nie"}</p>

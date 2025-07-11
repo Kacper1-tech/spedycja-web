@@ -88,10 +88,13 @@ export default function ListaZlecenExport() {
               row.delivery_date_end
             );
           } else if (key === "pickup_address") {
-            cell = safeParseArray(row.adresy_odbioru_json)[0]?.nazwa || "-";
-          } else if (key === "delivery_address") {
-            cell = safeParseArray(row.adresy_dostawy_json)[0]?.nazwa || "-";
-          } else if (key === "identyfikator") {
+						const a = safeParseArray(row.adresy_odbioru_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+					} else if (key === "delivery_address") {
+						const a = safeParseArray(row.adresy_dostawy_json)[0];
+						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+					} 
+						else if (key === "identyfikator") {
             cell =
               row.zl_vat ||
               row.zl_nip ||
@@ -241,11 +244,17 @@ export default function ListaZlecenExport() {
                     "-"}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
-                  {safeParseArray(row.adresy_odbioru_json)[0]?.nazwa || "-"}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap">
-                  {safeParseArray(row.adresy_dostawy_json)[0]?.nazwa || "-"}
-                </td>
+									{(() => {
+										const a = safeParseArray(row.adresy_odbioru_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+									})()}
+								</td>
+								<td className="px-4 py-2 whitespace-nowrap">
+									{(() => {
+										const a = safeParseArray(row.adresy_dostawy_json)[0];
+										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
+									})()}
+								</td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   {row.cena} {getCurrencySymbol(row.waluta)}

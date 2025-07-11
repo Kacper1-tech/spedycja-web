@@ -5,15 +5,15 @@ import { getCurrencySymbol } from "../utils/currency";
 
 export default function TransportTab() {
   const [planRows, setPlanRows] = useState([]); // lewa tabela
-  const [orders, setOrders] = useState([]); // prawa tabela
-  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [setOrders] = useState([]); // prawa tabela
+  const [filteredOrders] = useState([]);
 
   const [driverName, setDriverName] = useState("");
   const [dateSeparator, setDateSeparator] = useState("");
   const [filterDriver, setFilterDriver] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
 
-  const [newExport, setNewExport] = useState("");
+
   const [newImport, setNewImport] = useState("");
   const [note, setNote] = useState("");
 	const [newExportData, setNewExportData] = useState("");
@@ -29,6 +29,8 @@ export default function TransportTab() {
 	const [exportOrders, setExportOrders] = useState([]);
 	const [importOrders, setImportOrders] = useState([]);
 	const [pozostaleOrders, setPozostaleOrders] = useState([]);
+	const [showHiddenModal, setShowHiddenModal] = useState(false);
+	const [hiddenOrders, setHiddenOrders] = useState([]);
 
   useEffect(() => {
     fetchPlan();
@@ -80,9 +82,6 @@ export default function TransportTab() {
 			.select("*")
 			.eq("hidden_in_transport", false);
 
-		const sortByDeliveryDate = (a, b) =>
-			new Date(a.delivery_date_start || "2100-12-31") - new Date(b.delivery_date_start || "2100-12-31");
-
 		const sortByPickupDate = (a, b) =>
 			new Date(a.pickup_date_start || "2100-12-31") - new Date(b.pickup_date_start || "2100-12-31");
 
@@ -96,7 +95,70 @@ export default function TransportTab() {
 			...(pozostaleData || [])
 		]);
 	};
+	
+	const fetchHiddenOrders = async () => {
+		const { data: exportHidden } = await supabase
+			.from("zlecenia_export")
+			.select("*")
+			.eq("hidden_in_transport", true);
 
+		const { data: importHidden } = await supabase
+			.from("zlecenia_import")
+			.select("*")
+			.eq("hidden_in_transport", true);
+
+		const { data: pozostaleHidden } = await supabase
+			.from("zlecenia_pozostale")
+			.select("*")
+			.eq("hidden_in_transport", true);
+
+		setHiddenOrders([
+			...(exportHidden || []).map((o) => ({ ...o, typ: "Export" })),
+			...(importHidden || []).map((o) => ({ ...o, typ: "Import" })),
+			...(pozostaleHidden || []).map((o) => ({ ...o, typ: "Pozostałe" })),
+		]);
+	};
+	
+	const handleUnhideOrder = async (order) => {
+		let tableName = "";
+
+		if (order.typ === "Export") {
+			tableName = "zlecenia_export";
+		} else if (order.typ === "Import") {
+			tableName = "zlecenia_import";
+		} else {
+			tableName = "zlecenia_pozostale";
+		}
+
+		const { error } = await supabase
+			.from(tableName)
+			.update({ hidden_in_transport: false })
+			.eq("id", order.id);
+
+		if (error) {
+			console.error(error);
+			alert("Błąd podczas przywracania zlecenia.");
+			return;
+		}
+
+		// Użyj istniejącego obiektu + nowa flaga
+		const restored = { ...order, hidden_in_transport: false };
+
+		// Usuń z modala
+		setHiddenOrders((prev) => prev.filter((o) => o.id !== order.id));
+
+		// Dodaj do listy
+		if (order.typ === "Export") {
+			setExportOrders((prev) => [...prev, restored]);
+		} else if (order.typ === "Import") {
+			setImportOrders((prev) => [...prev, restored]);
+		} else {
+			setPozostaleOrders((prev) => [...prev, restored]);
+		}
+
+		alert("Zlecenie pokazane w liście!");
+	};
+	
 	const handleAddDriver = async () => {
 		// Zwiększ istniejących
 		for (let row of planRows) {
@@ -197,12 +259,12 @@ export default function TransportTab() {
 		}
 	};
 
-  const handleUpdateNote = async () => {
-    if (!selectedRow) return;
-    await supabase.from("transport_plan").update({ uwagi: note }).eq("id", selectedRow.id);
-    fetchPlan();
-    setNote("");
-  };
+	const handleUpdateNote = async () => {
+		if (!selectedRow) return;
+		await supabase.from("transport_plan").update({ uwagi: note }).eq("id", selectedRow.id);
+		fetchPlan();
+		setNote("");
+	};
 	
 	const handleDeleteNote = async () => {
 		if (!selectedRow) return;
@@ -313,32 +375,6 @@ export default function TransportTab() {
   const filteredPlanRows = planRows.filter(r =>
     r.kierowca.toLowerCase().includes(filterDriver)
   );
-	
-	const handleDrop = async (targetId) => {
-		if (draggedRowId === null || draggedRowId === targetId) return;
-
-		const fromIndex = planRows.findIndex(r => r.id === draggedRowId);
-		const toIndex = planRows.findIndex(r => r.id === targetId);
-
-		if (fromIndex === -1 || toIndex === -1) return;
-
-		const moving = planRows[fromIndex];
-		const updated = [...planRows];
-
-		updated.splice(fromIndex, 1);
-
-		// Jeśli przenosisz W DÓŁ — nowy indeks jest o 1 mniejszy:
-		const newIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
-		updated.splice(newIndex, 0, moving);
-
-		// 🟢 Ustaw nowe kolejnosc:
-		for (let i = 0; i < updated.length; i++) {
-			await supabase.from("transport_plan").update({ kolejnosc: i }).eq("id", updated[i].id);
-		}
-
-		fetchPlan();
-		setDraggedRowId(null);
-	};
 	
 	const handleDropZone = async (toIndex) => {
 		if (draggedRowId === null) return;
@@ -508,6 +544,14 @@ export default function TransportTab() {
 								className="bg-red-500 px-2 py-1 text-white rounded"
 							>
 								Usuń
+							</button>
+							<button
+								onClick={() => {
+									navigator.clipboard.writeText("✅");
+								}}
+								className="bg-green-500 px-2 py-1 text-white rounded"
+							>
+								✅
 							</button>
 						</div>
 					</div>
@@ -852,7 +896,18 @@ export default function TransportTab() {
 
 			{/* PRAWA TABELA */}
 			<div className="w-1/2 overflow-x-auto">
-				<div className="text-base font-bold mb-2">Lista Zleceń</div>
+				<div className="flex items-center justify-between mb-2">
+					<span className="text-base font-bold">Lista Zleceń</span>
+					<button
+						onClick={() => {
+							fetchHiddenOrders();
+							setShowHiddenModal(true);
+						}}
+						className="px-2 py-1 bg-gray-300 hover:bg-gray-400 rounded text-xs"
+					>
+						Pokaż ukryte
+					</button>
+				</div>
 				<table className="w-full border text-xs">
 					<thead>
 						<tr className="bg-gray-100">
@@ -878,10 +933,30 @@ export default function TransportTab() {
 								<td className="border p-2 text-center">{o.ldm}</td>
 								<td className="border p-2 text-center">{o.waga}</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_odbioru_json)[0]?.kod || "-" : "-"}
+									{(() => {
+									try {
+										if (o.adresy_odbioru_json) {
+										const parsed = JSON.parse(o.adresy_odbioru_json);
+										return parsed[0]?.kod || "-";
+										}
+									} catch {
+										return "-";
+									}
+									return "-";
+									})()}
 								</td>
 								<td className="border p-2 text-center">
-									{o.adresy_dostawy_json ? JSON.parse(o.adresy_dostawy_json)[0]?.kod || "-" : "-"}
+									{(() => {
+									try {
+										if (o.adresy_dostawy_json) {
+										const parsed = JSON.parse(o.adresy_dostawy_json);
+										return parsed[0]?.kod || "-";
+										}
+									} catch {
+										return "-";
+									}
+									return "-";
+									})()}
 								</td>
 								<td className="border p-2 text-center">{formatDateShort(o.delivery_date_start)}</td>
 								<td className="border p-2 text-center">
@@ -889,10 +964,10 @@ export default function TransportTab() {
 								</td>
 								<td className="border p-2 text-center">
 									<button
-										onClick={() => handleHideOrder(o)}
-										className="bg-yellow-500 px-2 py-1 rounded text-white text-xs"
+									onClick={() => handleHideOrder(o)}
+									className="bg-yellow-500 px-2 py-1 rounded text-white text-xs"
 									>
-										Ukryj
+									Ukryj
 									</button>
 								</td>
 							</tr>
@@ -1048,6 +1123,50 @@ export default function TransportTab() {
 					</div>
 				</div>
 			)}
+			{showHiddenModal && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+					<div className="bg-white p-6 rounded-lg max-w-4xl w-full overflow-y-auto max-h-[85vh]">
+						<h2 className="text-xl font-bold mb-4">Ukryte Zlecenia</h2>
+
+						<table className="w-full border text-xs">
+							<thead>
+								<tr className="bg-gray-100">
+									<th className="text-left p-2">Nr zlec.</th>
+									<th className="text-left p-2">Zleceniodawca</th>
+									<th className="text-left p-2">Typ</th>
+									<th className="text-left p-2">Akcje</th>
+								</tr>
+							</thead>
+							<tbody>
+								{hiddenOrders.map((o) => (
+									<tr key={o.id}>
+										<td className="border p-2">{o.numer_zlecenia}</td>
+										<td className="border p-2">{o.zl_nazwa || "-"}</td>
+										<td className="border p-2">{o.typ || "-"}</td>
+										<td className="border p-2">
+											<button
+												onClick={() => handleUnhideOrder(o)}
+												className="bg-green-500 text-white px-2 py-1 rounded text-xs"
+											>
+												Pokaż w liście
+											</button>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+
+						<div className="text-right mt-4">
+							<button
+								className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded"
+								onClick={() => setShowHiddenModal(false)}
+							>
+								Zamknij
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
-	);
-}
+	)
+};
