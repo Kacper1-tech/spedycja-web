@@ -1,0 +1,124 @@
+  body {
+    padding-top: 40px;
+    padding-bottom: 40px;
+    background-color: #FCFCFC;
+  }
+
+  @font-face {
+    font-family: Lato;
+    src: url(font/Lato.ttf);
+  }
+
+  @font-face {
+    font-family: LatoBold;
+    src: url(font/LatoBold.ttf);
+  }
+
+  p.small {
+    padding: 1px;
+    font-size: 0.75em;
+    margin: 0px;
+  }
+
+  h1.typein {
+    text-align: center;
+    font-family: LatoBold;
+    color: #002453;
+  }
+
+  h3.typein {
+    text-align: center;
+    font-family: LatoBold;
+    color: #002453;
+  }
+
+  h4.align-right {
+    text-align: right;
+  }
+
+  .form-signin {
+    max-width: 1000px;
+    padding: 19px 29px 29px;
+    margin: 0 auto 0px;
+    background-color: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+  }
+
+  .form-signin .form-signin-heading,
+  .form-signin .checkbox {
+    margin-bottom: 10px;
+  }
+
+  .form-signin input[type="text"],
+  .form-signin input[type="password"] {
+    font-size: 16px;
+    height: auto;
+    margin-bottom: 15px;
+    padding: 7px 9px;
+  }
+
+  .tytul1 {
+    color: #bd2222;
+    font-family: "Montserrat", Sans-serif;
+    font-size: 21px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .tytul2 {
+    color: #224f86;
+    font-size: 60px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .tytul3 {
+    color: #000;
+    font-family: "Montserrat", Sans-serif;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 27px;
+  }
+
+  .header {
+    background-color: #fff;
+  }
+
+  .footer {
+    background-color: #bd2222;
+    color: white;
+    text-align: center;
+    font-size: 30px;
+    padding: 30px;
+  }
+
+  a:link {
+    color: white;
+    background-color: transparent;
+    text-decoration: none;
+  }
+
+  a:visited {
+    color: black;
+    background-color: transparent;
+    text-decoration: none;
+  }
+
+  a:hover {
+    background-color: transparent;
+    text-decoration: underline;
+  }
+
+  a:active {
+    background-color: transparent;
+    text-decoration: underline;
+  }
+
+  .bannery {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+  }
