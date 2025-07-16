@@ -1,28 +1,28 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../../supabaseClient";
-import { getCurrencySymbol } from "../../utils/currency";
+import { useEffect, useState } from 'react';
+import { supabase } from '../../supabaseClient';
+import { getCurrencySymbol } from '../../utils/currency';
 
 export default function WykazExportLTL() {
-  console.log("🔥 Komponent WykazExportLTL się renderuje");
+  console.log('🔥 Komponent WykazExportLTL się renderuje');
   const [rows, setRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [allSelectedByWeek, setAllSelectedByWeek] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log("🔍 Startuje fetchData...");
+      console.log('🔍 Startuje fetchData...');
       const { data, error } = await supabase
-        .from("zlecenia_export")
-        .select("*")
-        .neq("ldm", "FTL")
-        .order("delivery_date_start", { ascending: true })
-        .order("pickup_date_start", { ascending: true })
-        .order("zl_nazwa", { ascending: true });
+        .from('zlecenia_export')
+        .select('*')
+        .neq('ldm', 'FTL')
+        .order('delivery_date_start', { ascending: true })
+        .order('pickup_date_start', { ascending: true })
+        .order('zl_nazwa', { ascending: true });
 
-      console.log("Zlecenia z Supabase:", data);
+      console.log('Zlecenia z Supabase:', data);
 
       if (error) {
-        console.error("Błąd ładowania danych:", error);
+        console.error('Błąd ładowania danych:', error);
       } else {
         setRows(data);
       }
@@ -31,16 +31,16 @@ export default function WykazExportLTL() {
   }, []);
 
   const formatDate = (dateString) => {
-    if (!dateString) return "-";
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    return `${date.toLocaleDateString("pl-PL", {
-      weekday: "long",
-    })}, ${date.toLocaleDateString("pl-PL")}`;
+    return `${date.toLocaleDateString('pl-PL', {
+      weekday: 'long',
+    })}, ${date.toLocaleDateString('pl-PL')}`;
   };
 
   const safeParse = (value) => {
     try {
-      return JSON.parse(value || "[]");
+      return JSON.parse(value || '[]');
     } catch {
       return [];
     }
@@ -48,7 +48,7 @@ export default function WykazExportLTL() {
 
   const handleSelectRow = (id) => {
     setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
     );
   };
 
@@ -58,7 +58,7 @@ export default function WykazExportLTL() {
     if (allSelected) {
       // Odznacz tylko w tym tygodniu
       const remaining = selectedRows.filter(
-        (id) => !rowsInWeek.some((row) => row.id === id)
+        (id) => !rowsInWeek.some((row) => row.id === id),
       );
       setSelectedRows(remaining);
     } else {
@@ -70,7 +70,7 @@ export default function WykazExportLTL() {
 
     setAllSelectedByWeek({
       ...allSelectedByWeek,
-      [weekNumber]: !allSelected
+      [weekNumber]: !allSelected,
     });
   };
 
@@ -93,7 +93,7 @@ export default function WykazExportLTL() {
         ((date.getTime() - week1.getTime()) / 86400000 -
           3 +
           ((week1.getDay() + 6) % 7)) /
-          7
+          7,
       )
     );
   }
@@ -109,6 +109,16 @@ export default function WykazExportLTL() {
 
   const handlePrintForWeek = (weekNumber) => {
     const rowsInWeek = groupedRows[weekNumber];
+
+    // 🔸 Filtruj tylko zaznaczone wiersze w danym tygodniu
+    const selectedRowsInWeek = rowsInWeek.filter((row) =>
+      selectedRows.includes(row.id),
+    );
+
+    if (selectedRowsInWeek.length === 0) {
+      alert('Nie zaznaczono żadnych wierszy do druku.');
+      return;
+    }
 
     const html = `
       <html>
@@ -135,19 +145,6 @@ export default function WykazExportLTL() {
             tr:nth-child(even) {
               background-color: #fafafa;
             }
-
-            /* ✅ Szerokości kolumn w % */
-            th:nth-child(1), td:nth-child(1) { width: 12%; }
-            th:nth-child(2), td:nth-child(2) { width: 9%; }
-            th:nth-child(3), td:nth-child(3) { width: 10%; }
-            th:nth-child(4), td:nth-child(4) { width: 7%; }
-            th:nth-child(5), td:nth-child(5) { width: 3%; }
-            th:nth-child(6), td:nth-child(6) { width: 20%; }
-            th:nth-child(7), td:nth-child(7) { width: 5%; }
-            th:nth-child(8), td:nth-child(8) { width: 7%; }
-            th:nth-child(9), td:nth-child(9) { width: 10%; }
-            th:nth-child(10), td:nth-child(10) { width: 9%; }
-            th:nth-child(11), td:nth-child(11) { width: 8%; }
           </style>
         </head>
         <body>
@@ -169,32 +166,38 @@ export default function WykazExportLTL() {
               </tr>
             </thead>
             <tbody>
-              ${rowsInWeek.map(row => `
+              ${selectedRowsInWeek
+                .map(
+                  (row) => `
                 <tr>
                   <td>${row.zl_nazwa}</td>
                   <td>${formatDate(row.pickup_date_start)}</td>
-                  <td>${safeParse(row.adresy_odbioru_json)[0]?.miasto || row.zl_miasto || "-"}</td>
-                  <td>${row.export_customs_option === "adres"
-                    ? (safeParse(row.export_customs_adres_json)?.miasto || "-")
-                    : row.export_customs_option === "odbior"
-                    ? "Na zał"
-                    : "-"}</td>
-                  <td>${row.palety || "-"}</td>
-                  <td>${row.wymiar || "-"}</td>
-                  <td>${row.ldm || "-"}</td>
-                  <td>${row.waga || "-"}</td>
-                  <td>${safeParse(row.adresy_dostawy_json)[0]?.kod || row.zl_kod_pocztowy || "-"}</td>
+                  <td>${safeParse(row.adresy_odbioru_json)[0]?.miasto || row.zl_miasto || '-'}</td>
+                  <td>${
+                    row.export_customs_option === 'adres'
+                      ? safeParse(row.export_customs_adres_json)?.miasto || '-'
+                      : row.export_customs_option === 'odbior'
+                        ? 'Na zał'
+                        : '-'
+                  }</td>
+                  <td>${row.palety || '-'}</td>
+                  <td>${row.wymiar || '-'}</td>
+                  <td>${row.ldm || '-'}</td>
+                  <td>${row.waga || '-'}</td>
+                  <td>${safeParse(row.adresy_dostawy_json)[0]?.kod || row.zl_kod_pocztowy || '-'}</td>
                   <td>${formatDate(row.delivery_date_start)}</td>
                   <td>${row.cena} ${getCurrencySymbol(row.waluta)}</td>
                 </tr>
-              `).join("")}
+              `,
+                )
+                .join('')}
             </tbody>
           </table>
         </body>
       </html>
     `;
 
-    const printWindow = window.open("", "", "width=1024,height=768");
+    const printWindow = window.open('', '', 'width=1024,height=768');
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -214,9 +217,7 @@ export default function WykazExportLTL() {
       {Object.entries(groupedRows).map(([weekNumber, rowsInWeek]) => (
         <div key={weekNumber} className="mb-12">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">
-              Tydzień {weekNumber}
-            </h2>
+            <h2 className="text-xl font-bold">Tydzień {weekNumber}</h2>
 
             <div className="no-print flex gap-4">
               <button
@@ -249,7 +250,9 @@ export default function WykazExportLTL() {
                     <input
                       type="checkbox"
                       className="no-print"
-                      onChange={() => handleSelectAllForWeek(weekNumber, rowsInWeek)}
+                      onChange={() =>
+                        handleSelectAllForWeek(weekNumber, rowsInWeek)
+                      }
                       checked={allSelectedByWeek[weekNumber] || false}
                     />
                   </th>
@@ -272,7 +275,7 @@ export default function WykazExportLTL() {
                   <tr
                     key={row.id}
                     className={`hover:bg-gray-50 border-b border-gray-300 ${
-                      selectedRows.includes(row.id) ? "selected" : ""
+                      selectedRows.includes(row.id) ? 'selected' : ''
                     }`}
                   >
                     <td className="px-4 py-2 text-center">
@@ -289,22 +292,29 @@ export default function WykazExportLTL() {
                     </td>
                     <td className="px-4 py-2 text-center">
                       {safeParse(row.adresy_odbioru_json)[0]?.miasto ||
-                        row.zl_miasto?.trim() || "-"}
+                        row.zl_miasto?.trim() ||
+                        '-'}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      {row.export_customs_option === "adres"
-                        ? safeParse(row.export_customs_adres_json)?.miasto || "-"
-                        : row.export_customs_option === "odbior"
-                        ? "Na zał"
-                        : "-"}
+                      {row.export_customs_option === 'adres'
+                        ? safeParse(row.export_customs_adres_json)?.miasto ||
+                          '-'
+                        : row.export_customs_option === 'odbior'
+                          ? 'Na zał'
+                          : '-'}
                     </td>
-                    <td className="px-4 py-2 text-center">{row.palety || "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.wymiar || "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.ldm || "-"}</td>
-                    <td className="px-4 py-2 text-center">{row.waga || "-"}</td>
+                    <td className="px-4 py-2 text-center">
+                      {row.palety || '-'}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {row.wymiar || '-'}
+                    </td>
+                    <td className="px-4 py-2 text-center">{row.ldm || '-'}</td>
+                    <td className="px-4 py-2 text-center">{row.waga || '-'}</td>
                     <td className="px-4 py-2 text-center">
                       {safeParse(row.adresy_dostawy_json)[0]?.kod ||
-                        row.zl_kod_pocztowy?.trim() || "-"}
+                        row.zl_kod_pocztowy?.trim() ||
+                        '-'}
                     </td>
                     <td className="px-4 py-2 text-center">
                       {formatDate(row.delivery_date_start)}
