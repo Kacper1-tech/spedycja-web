@@ -35,27 +35,6 @@ const Plan = () => {
     printWindow.print();
   };
 
-  const getWeekDates = () => {
-    const today = new Date();
-    const monday = new Date(
-      today.setDate(today.getDate() - today.getDay() + 1),
-    );
-    const dates = [];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      dates.push({
-        iso: d.toISOString().split('T')[0],
-        label: d.toLocaleDateString('pl-PL', {
-          weekday: 'long',
-          day: '2-digit',
-          month: '2-digit',
-        }),
-      });
-    }
-    return dates;
-  };
-
   const getFirstAddressCity = (adresyJson) => {
     try {
       const adresy =
@@ -186,10 +165,23 @@ const Plan = () => {
     const zaladunkiOrders = exportRes.data || [];
     const rozladunkiOrders = importRes.data || [];
 
-    const dataByDay = {};
-    const dates = getWeekDates();
+    const allDatesSet = new Set();
 
-    dates.forEach(({ iso }) => {
+    // zbierz wszystkie unikalne daty załadunku i rozładunku
+    zaladunkiOrders.forEach((order) => {
+      if (order.pickup_date_start) {
+        allDatesSet.add(order.pickup_date_start);
+      }
+    });
+    rozladunkiOrders.forEach((order) => {
+      if (order.delivery_date_end) {
+        allDatesSet.add(order.delivery_date_end);
+      }
+    });
+
+    const allDates = Array.from(allDatesSet).sort(); // posortowane rosnąco
+    const dataByDay = {};
+    allDates.forEach((iso) => {
       dataByDay[iso] = { zaladunki: [], rozladunki: [] };
     });
 
@@ -242,7 +234,16 @@ const Plan = () => {
     fetchData();
   }, []);
 
-  const weekDates = getWeekDates();
+  const weekDates = Object.keys(weeklyData)
+    .sort()
+    .map((iso) => ({
+      iso,
+      label: new Date(iso).toLocaleDateString('pl-PL', {
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit',
+      }),
+    }));
 
   return (
     <div className="p-4 space-y-8">
@@ -397,7 +398,7 @@ const Plan = () => {
                         <td className="border p-2">
                           <input
                             type="text"
-                            defaultValue={z.uwagi}
+                            defaultValue=""
                             onBlur={async (e) => {
                               const { error } = await supabase
                                 .from('zlecenia_export')
@@ -861,7 +862,6 @@ const Plan = () => {
                 </tbody>
               </table>
             )}
-            <p className="text-sm text-gray-500">Brak rozładunków</p>
             {/* Inne */}
             <div className="mt-6">
               <div className="flex items-center justify-between mb-2">
