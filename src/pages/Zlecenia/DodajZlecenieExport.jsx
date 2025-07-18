@@ -9,10 +9,6 @@ export default function DodajZlecenieExport() {
   const { id } = useParams();
   const [pickupAddresses, setPickupAddresses] = useState([{}]);
   const [deliveryAddresses, setDeliveryAddresses] = useState([{}]);
-  const [extraExportCustomsVisible, setExtraExportCustomsVisible] =
-    useState(false);
-  const [extraImportCustomsVisible, setExtraImportCustomsVisible] =
-    useState(false);
   const [extraNotesVisible, setExtraNotesVisible] = useState(false);
   const [vat, setVat] = useState('');
   const [showOtherIds, setShowOtherIds] = useState(false);
@@ -26,9 +22,6 @@ export default function DodajZlecenieExport() {
   const [importCustomsOption, setImportCustomsOption] = useState(''); // "odbior" lub "adres"
   const [currency, setCurrency] = useState('EUR');
   const [customCurrency, setCustomCurrency] = useState('');
-  const [paymentDays, setPaymentDays] = useState('');
-  const [sendEmail, setSendEmail] = useState(false);
-  const [sendPost, setSendPost] = useState(false);
   const [exportCustomsAddress, setExportCustomsAddress] = useState({});
   const [importCustomsAddress, setImportCustomsAddress] = useState({});
   const [palety, setPalety] = useState('');
@@ -59,10 +52,7 @@ export default function DodajZlecenieExport() {
   const [kontrahenciSugestie, setKontrahenciSugestie] = useState([]);
   const [kontrahentId, setKontrahentId] = useState(null);
   const [exportCustomsSuggestions, setExportCustomsSuggestions] = useState([]);
-  const [importCustomsSuggestions, setImportCustomsSuggestions] = useState([]);
-  const [pickupDateIsRange, setPickupDateIsRange] = useState(false);
   const [pickupTimeIsRange, setPickupTimeIsRange] = useState(false);
-  const [deliveryDateIsRange, setDeliveryDateIsRange] = useState(false);
   const [deliveryTimeIsRange, setDeliveryTimeIsRange] = useState(false);
   const [pickupSuggestions, setPickupSuggestions] = useState([[]]);
   const [deliverySuggestions, setDeliverySuggestions] = useState([[]]);
@@ -136,9 +126,6 @@ export default function DodajZlecenieExport() {
 
       setCurrency(data.waluta || '');
       setCustomCurrency(data.custom_currency || '');
-      setPaymentDays(data.termin_dni || '');
-      setSendEmail(data.wyslac_email || false);
-      setSendPost(data.wyslac_poczta || false);
 
       setPickupAddresses(JSON.parse(data.adresy_odbioru_json || '[]'));
       setDeliveryAddresses(JSON.parse(data.adresy_dostawy_json || '[]'));
@@ -363,11 +350,6 @@ export default function DodajZlecenieExport() {
 
       waluta: currency || originalZlecenie.waluta,
       custom_currency: customCurrency || originalZlecenie.custom_currency,
-      termin_dni: paymentDays
-        ? parseInt(paymentDays)
-        : originalZlecenie.termin_dni,
-      wyslac_email: sendEmail,
-      wyslac_poczta: sendPost,
 
       adresy_odbioru_json:
         pickupAddresses?.length && pickupAddresses[0]?.nazwa
@@ -484,59 +466,6 @@ export default function DodajZlecenieExport() {
     alert(id ? 'Zlecenie zaktualizowane.' : 'Zlecenie dodane.');
     navigate('/zlecenia/export/lista');
     setIsSubmitting(false);
-  };
-
-  const resetForm = () => {
-    setPickupAddresses([{}]);
-    setDeliveryAddresses([{}]);
-    setExtraExportCustomsVisible(false);
-    setExtraImportCustomsVisible(false);
-    setExtraNotesVisible(false);
-    setVat('');
-    setShowOtherIds(false);
-    setShowPickupRange(false);
-    setPickupRange([null, null]);
-    setShowDeliveryRange(false);
-    setDeliveryRange([null, null]);
-    setPickupDate(new Date());
-    setDeliveryDate(new Date());
-    setExportCustomsOption('');
-    setImportCustomsOption('');
-    setCurrency('EUR');
-    setCustomCurrency('');
-    setPaymentDays('');
-    setSendEmail(false);
-    setSendPost(false);
-    setExportCustomsAddress({});
-    setImportCustomsAddress({});
-    setPalety('');
-    setWaga('');
-    setWymiar('');
-    setLdm('');
-    setCena('');
-    setUwagi('');
-    setNumerZlecenia('');
-    setOsobaKontaktowa('');
-    setTelefonKontaktowy('');
-    setEmailKontaktowy('');
-    setZlNazwa('');
-    setZlUlica('');
-    setZlMiasto('');
-    setZlKodPocztowy('');
-    setZlPanstwo('');
-    setZlNip('');
-    setZlRegon('');
-    setZlEori('');
-    setZlPesel('');
-    setPickupTime('');
-    setPickupTimeRange(['', '']);
-    setDeliveryTime('');
-    setDeliveryTimeRange(['', '']);
-  };
-
-  const getWeekday = (date) => {
-    if (!date) return '';
-    return date.toLocaleDateString('pl-PL', { weekday: 'long' });
   };
 
   const addPickupAddress = () => {
@@ -730,34 +659,6 @@ export default function DodajZlecenieExport() {
       panstwo: agency.panstwo,
     });
     setExportCustomsSuggestions([]);
-  };
-
-  const handleImportCustomsNameChange = async (e) => {
-    const value = e.target.value;
-    setImportCustomsAddress({ ...importCustomsAddress, nazwa: value });
-
-    if (value.length >= 2) {
-      const { data, error } = await supabase
-        .from('agencje_celne')
-        .select('*')
-        .ilike('nazwa', `${value}%`)
-        .limit(5);
-
-      if (!error) setImportCustomsSuggestions(data);
-    } else {
-      setImportCustomsSuggestions([]);
-    }
-  };
-
-  const handleImportCustomsSelect = (agency) => {
-    setImportCustomsAddress({
-      nazwa: agency.nazwa,
-      ulica: agency.ulica_nr,
-      miasto: agency.miasto,
-      kod: agency.kod_pocztowy,
-      panstwo: agency.panstwo,
-    });
-    setImportCustomsSuggestions([]);
   };
 
   const handleZlNazwaChange = async (e) => {
@@ -1599,7 +1500,7 @@ export default function DodajZlecenieExport() {
 
       {/* Fracht + Termin płatności */}
       <div className="border-t pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
+        <div className="flex justify-center">
           {/* Fracht */}
           <div className="w-full max-w-xs flex flex-col items-center">
             <h2 className="font-semibold text-center mb-4">Fracht</h2>
@@ -1650,42 +1551,6 @@ export default function DodajZlecenieExport() {
                 />
               </div>
             )}
-          </div>
-
-          {/* Termin płatności */}
-          <div className="w-full max-w-xs flex flex-col items-center">
-            <h2 className="font-semibold text-center mb-4">Termin płatności</h2>
-            <div className="flex gap-6 justify-center items-start flex-wrap">
-              <div className="flex flex-col items-center">
-                <label className="text-sm mb-1">Ilość dni</label>
-                <input
-                  type="text"
-                  placeholder="Np. 30"
-                  className="px-3 py-1 border rounded w-24 text-center"
-                  value={paymentDays}
-                  onChange={(e) => setPaymentDays(e.target.value)}
-                />
-              </div>
-
-              <div className="flex flex-col items-start space-y-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={sendEmail}
-                    onChange={() => setSendEmail(!sendEmail)}
-                  />
-                  e-mail
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={sendPost}
-                    onChange={() => setSendPost(!sendPost)}
-                  />
-                  poczta
-                </label>
-              </div>
-            </div>
           </div>
         </div>
       </div>

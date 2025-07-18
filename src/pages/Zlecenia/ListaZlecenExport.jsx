@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../../supabaseClient";
-import { useNavigate } from "react-router-dom";
-import { getCurrencySymbol } from "../../utils/currency";
+import { useEffect, useState } from 'react';
+import { supabase } from '../../supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { getCurrencySymbol } from '../../utils/currency';
 
 export default function ListaZlecenExport() {
   const navigate = useNavigate();
@@ -16,11 +16,11 @@ export default function ListaZlecenExport() {
   useEffect(() => {
     const fetchData = async () => {
       const { data, error } = await supabase
-        .from("zlecenia_export")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .from('zlecenia_export')
+        .select('*')
+        .order('created_at', { ascending: false });
       if (error) {
-        console.error("Błąd ładowania danych:", error);
+        console.error('Błąd ładowania danych:', error);
       } else {
         setRows(data);
         setFilteredRows(data);
@@ -31,7 +31,7 @@ export default function ListaZlecenExport() {
 
   const handleSelectRow = (id) => {
     setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
     );
   };
 
@@ -52,18 +52,18 @@ export default function ListaZlecenExport() {
   };
 
   const formatDateRange = (start, end) => {
-    if (!start) return "-";
+    if (!start) return '-';
     const dStart = new Date(start);
     const dEnd = end ? new Date(end) : null;
 
     const fmt = (d) =>
-      `${String(d.getDate()).padStart(2, "0")}.${String(
-        d.getMonth() + 1
-      ).padStart(2, "0")}.${d.getFullYear()}`;
+      `${String(d.getDate()).padStart(2, '0')}.${String(
+        d.getMonth() + 1,
+      ).padStart(2, '0')}.${d.getFullYear()}`;
     const fmtShort = (d) =>
-      `${String(d.getDate()).padStart(2, "0")}.${String(
-        d.getMonth() + 1
-      ).padStart(2, "0")}`;
+      `${String(d.getDate()).padStart(2, '0')}.${String(
+        d.getMonth() + 1,
+      ).padStart(2, '0')}`;
 
     if (!dEnd || fmt(dStart) === fmt(dEnd)) return fmt(dStart);
 
@@ -79,35 +79,34 @@ export default function ListaZlecenExport() {
     setFilteredRows(
       rows.filter((row) => {
         return Object.entries(newFilters).every(([key, val]) => {
-          let cell = "";
-          if (key === "pickup_date") {
+          let cell = '';
+          if (key === 'pickup_date') {
             cell = formatDateRange(row.pickup_date_start, row.pickup_date_end);
-          } else if (key === "delivery_date") {
+          } else if (key === 'delivery_date') {
             cell = formatDateRange(
               row.delivery_date_start,
-              row.delivery_date_end
+              row.delivery_date_end,
             );
-          } else if (key === "pickup_address") {
-						const a = safeParseArray(row.adresy_odbioru_json)[0];
-						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
-					} else if (key === "delivery_address") {
-						const a = safeParseArray(row.adresy_dostawy_json)[0];
-						cell = a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
-					} 
-						else if (key === "identyfikator") {
+          } else if (key === 'pickup_address') {
+            const a = safeParseArray(row.adresy_odbioru_json)[0];
+            cell = a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+          } else if (key === 'delivery_address') {
+            const a = safeParseArray(row.adresy_dostawy_json)[0];
+            cell = a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+          } else if (key === 'identyfikator') {
             cell =
               row.zl_vat ||
               row.zl_nip ||
               row.zl_regon ||
               row.zl_eori ||
               row.zl_pesel ||
-              "-";
+              '-';
           } else {
-            cell = row[key] || "";
+            cell = row[key] || '';
           }
           return cell.toString().toLowerCase().includes(val);
         });
-      })
+      }),
     );
   };
 
@@ -118,12 +117,12 @@ export default function ListaZlecenExport() {
       return;
 
     const { error } = await supabase
-      .from("zlecenia_export")
+      .from('zlecenia_export')
       .delete()
-      .in("id", selectedRows);
+      .in('id', selectedRows);
 
     if (error) {
-      console.error("Błąd usuwania:", error);
+      console.error('Błąd usuwania:', error);
     } else {
       const newRows = rows.filter((row) => !selectedRows.includes(row.id));
       setRows(newRows);
@@ -135,11 +134,31 @@ export default function ListaZlecenExport() {
 
   function safeParseArray(value) {
     try {
-      const parsed = JSON.parse(value || "[]");
+      const parsed = JSON.parse(value || '[]');
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
+  }
+
+  let exportAddr = null;
+  let importAddr = null;
+
+  if (showModal && selectedZlecenie) {
+    exportAddr =
+      selectedZlecenie.export_customs_adres_json &&
+      typeof selectedZlecenie.export_customs_adres_json === 'string'
+        ? JSON.parse(selectedZlecenie.export_customs_adres_json)
+        : selectedZlecenie.export_customs_adres_json;
+
+    importAddr =
+      selectedZlecenie.import_customs_adres_json &&
+      typeof selectedZlecenie.import_customs_adres_json === 'string'
+        ? JSON.parse(selectedZlecenie.import_customs_adres_json)
+        : selectedZlecenie.import_customs_adres_json;
+
+    console.log('EXPORT:', exportAddr);
+    console.log('IMPORT:', importAddr);
   }
 
   return (
@@ -174,18 +193,18 @@ export default function ListaZlecenExport() {
             <tr className="bg-gray-50">
               <td className="px-4 py-2"></td>
               {[
-                { key: "numer_zlecenia" },
-                { key: "zl_nazwa" },
-                { key: "identyfikator" },
-                { key: "pickup_date" },
-                { key: "pickup_time" },
-                { key: "delivery_date" },
-                { key: "delivery_time" },
-                { key: "pickup_address" },
-                { key: "delivery_address" },
-                { key: "ldm" },
-                { key: "cena" },
-                { key: "uwagi" },
+                { key: 'numer_zlecenia' },
+                { key: 'zl_nazwa' },
+                { key: 'identyfikator' },
+                { key: 'pickup_date' },
+                { key: 'pickup_time' },
+                { key: 'delivery_date' },
+                { key: 'delivery_time' },
+                { key: 'pickup_address' },
+                { key: 'delivery_address' },
+                { key: 'ldm' },
+                { key: 'cena' },
+                { key: 'uwagi' },
               ].map(({ key }) => (
                 <td key={key} className="px-4 py-2">
                   <input
@@ -220,7 +239,7 @@ export default function ListaZlecenExport() {
                     row.zl_regon ||
                     row.zl_eori ||
                     row.zl_pesel ||
-                    "-"}
+                    '-'}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   {formatDateRange(row.pickup_date_start, row.pickup_date_end)}
@@ -229,32 +248,32 @@ export default function ListaZlecenExport() {
                   {row.pickup_time ||
                     (row.pickup_time_start &&
                       `${row.pickup_time_start} – ${row.pickup_time_end}`) ||
-                    "-"}
+                    '-'}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   {formatDateRange(
                     row.delivery_date_start,
-                    row.delivery_date_end
+                    row.delivery_date_end,
                   )}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   {row.delivery_time ||
                     (row.delivery_time_start &&
                       `${row.delivery_time_start} – ${row.delivery_time_end}`) ||
-                    "-"}
+                    '-'}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">
-									{(() => {
-										const a = safeParseArray(row.adresy_odbioru_json)[0];
-										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
-									})()}
-								</td>
-								<td className="px-4 py-2 whitespace-nowrap">
-									{(() => {
-										const a = safeParseArray(row.adresy_dostawy_json)[0];
-										return a ? `${a.kod || "-"} ${a.miasto || "-"}` : "-";
-									})()}
-								</td>
+                  {(() => {
+                    const a = safeParseArray(row.adresy_odbioru_json)[0];
+                    return a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+                  })()}
+                </td>
+                <td className="px-4 py-2 whitespace-nowrap">
+                  {(() => {
+                    const a = safeParseArray(row.adresy_dostawy_json)[0];
+                    return a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+                  })()}
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap">{row.ldm}</td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   {row.cena} {getCurrencySymbol(row.waluta)}
@@ -286,15 +305,15 @@ export default function ListaZlecenExport() {
                   Informacje podstawowe
                 </h3>
                 <p>
-                  <strong>Nr zlecenia:</strong>{" "}
+                  <strong>Nr zlecenia:</strong>{' '}
                   {selectedZlecenie.numer_zlecenia}
                 </p>
                 <p>
-                  <strong>Osoba kontaktowa:</strong>{" "}
+                  <strong>Osoba kontaktowa:</strong>{' '}
                   {selectedZlecenie.osoba_kontaktowa}
                 </p>
                 <p>
-                  <strong>Telefon:</strong>{" "}
+                  <strong>Telefon:</strong>{' '}
                   {selectedZlecenie.telefon_kontaktowy}
                 </p>
                 <p>
@@ -308,8 +327,8 @@ export default function ListaZlecenExport() {
                   <strong>Nazwa:</strong> {selectedZlecenie.zl_nazwa}
                 </p>
                 <p>
-                  <strong>Adres:</strong> {selectedZlecenie.zl_ulica},{" "}
-                  {selectedZlecenie.zl_kod_pocztowy}{" "}
+                  <strong>Adres:</strong> {selectedZlecenie.zl_ulica},{' '}
+                  {selectedZlecenie.zl_kod_pocztowy}{' '}
                   {selectedZlecenie.zl_miasto}, {selectedZlecenie.zl_panstwo}
                 </p>
                 <p>
@@ -332,17 +351,17 @@ export default function ListaZlecenExport() {
               <div>
                 <h3 className="font-semibold text-lg mb-1">Załadunek</h3>
                 <p>
-                  <strong>Data:</strong>{" "}
+                  <strong>Data:</strong>{' '}
                   {formatDateRange(
                     selectedZlecenie.pickup_date_start,
-                    selectedZlecenie.pickup_date_end
+                    selectedZlecenie.pickup_date_end,
                   )}
                 </p>
                 <p>
-                  <strong>Godzina:</strong>{" "}
+                  <strong>Godzina:</strong>{' '}
                   {selectedZlecenie.pickup_time ||
-                    `${selectedZlecenie.pickup_time_start || ""} – ${
-                      selectedZlecenie.pickup_time_end || ""
+                    `${selectedZlecenie.pickup_time_start || ''} – ${
+                      selectedZlecenie.pickup_time_end || ''
                     }`}
                 </p>
                 <p>
@@ -354,7 +373,7 @@ export default function ListaZlecenExport() {
                       <li key={i}>
                         {a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}
                       </li>
-                    )
+                    ),
                   )}
                 </ul>
               </div>
@@ -362,17 +381,17 @@ export default function ListaZlecenExport() {
               <div>
                 <h3 className="font-semibold text-lg mb-1">Rozładunek</h3>
                 <p>
-                  <strong>Data:</strong>{" "}
+                  <strong>Data:</strong>{' '}
                   {formatDateRange(
                     selectedZlecenie.delivery_date_start,
-                    selectedZlecenie.delivery_date_end
+                    selectedZlecenie.delivery_date_end,
                   )}
                 </p>
                 <p>
-                  <strong>Godzina:</strong>{" "}
+                  <strong>Godzina:</strong>{' '}
                   {selectedZlecenie.delivery_time ||
-                    `${selectedZlecenie.delivery_time_start || ""} – ${
-                      selectedZlecenie.delivery_time_end || ""
+                    `${selectedZlecenie.delivery_time_start || ''} – ${
+                      selectedZlecenie.delivery_time_end || ''
                     }`}
                 </p>
                 <p>
@@ -384,7 +403,7 @@ export default function ListaZlecenExport() {
                       <li key={i}>
                         {a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}
                       </li>
-                    )
+                    ),
                   )}
                 </ul>
               </div>
@@ -408,37 +427,57 @@ export default function ListaZlecenExport() {
               <div>
                 <h3 className="font-semibold text-lg mb-1">Cło</h3>
                 <p>
-                  <strong>Odprawa celna exportowa:</strong>{" "}
+                  <strong>Odprawa celna exportowa:</strong>{' '}
                   {selectedZlecenie.export_customs_option}
                 </p>
                 <p>
                   <strong>Adres export:</strong>
                 </p>
-                <ul className="list-disc pl-5">
-                  {safeParseArray(
-                    selectedZlecenie.export_customs_adres_json
-                  ).map((a, i) => (
-                    <li key={i}>
-                      {a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}
-                    </li>
-                  ))}
-                </ul>
+                {selectedZlecenie.export_customs_option === 'adres' &&
+                exportAddr ? (
+                  <div className="text-sm leading-tight ml-5">
+                    <p>{exportAddr.nazwa}</p>
+                    <p>{exportAddr.ulica}</p>
+                    <p>
+                      {exportAddr.kod} {exportAddr.miasto}
+                    </p>
+                    <p>{exportAddr.panstwo}</p>
+                    {exportAddr.uwagi && (
+                      <p className="italic">({exportAddr.uwagi})</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-gray-500 ml-5">
+                    W miejscu odbioru
+                  </p>
+                )}
                 <p>
-                  <strong>Odprawa celna importowa:</strong>{" "}
+                  <strong>Odprawa celna importowa:</strong>{' '}
                   {selectedZlecenie.import_customs_option}
                 </p>
                 <p>
                   <strong>Adres import:</strong>
                 </p>
-                <ul className="list-disc pl-5">
-                  {safeParseArray(
-                    selectedZlecenie.import_customs_adres_json
-                  ).map((a, i) => (
-                    <li key={i}>
-                      {a.nazwa}, {a.ulica}, {a.kod} {a.miasto}, {a.panstwo}
-                    </li>
-                  ))}
-                </ul>
+                {selectedZlecenie.import_customs_option === 'adres' &&
+                importAddr ? (
+                  <div className="text-sm leading-tight ml-5">
+                    <p>{importAddr.nazwa}</p>
+                    <p>{importAddr.ulica}</p>
+                    <p>
+                      {importAddr.kod} {importAddr.miasto}
+                    </p>
+                    <p>{importAddr.panstwo}</p>
+                    {importAddr.uwagi && (
+                      <p className="italic">({importAddr.uwagi})</p>
+                    )}
+                  </div>
+                ) : selectedZlecenie.import_customs_option === 'odbior' ? (
+                  <p className="text-sm italic text-gray-500 ml-5">GVMS</p>
+                ) : (
+                  <p className="text-sm italic text-gray-500 ml-5">
+                    W miejscu dostawy
+                  </p>
+                )}
               </div>
 
               <div>
@@ -446,26 +485,26 @@ export default function ListaZlecenExport() {
                   Fracht i płatność
                 </h3>
                 <p>
-                  <strong>Cena:</strong> {selectedZlecenie.cena}{" "}
+                  <strong>Cena:</strong> {selectedZlecenie.cena}{' '}
                   {getCurrencySymbol(selectedZlecenie.waluta)}
                 </p>
                 <p>
-                  <strong>Termin płatności:</strong>{" "}
+                  <strong>Termin płatności:</strong>{' '}
                   {selectedZlecenie.termin_dni} dni
                 </p>
                 <p>
-                  <strong>Wysłać e-mailem:</strong>{" "}
-                  {selectedZlecenie.wyslac_email ? "Tak" : "Nie"}
+                  <strong>Wysłać e-mailem:</strong>{' '}
+                  {selectedZlecenie.wyslac_email ? 'Tak' : 'Nie'}
                 </p>
                 <p>
-                  <strong>Wysłać pocztą:</strong>{" "}
-                  {selectedZlecenie.wyslac_poczta ? "Tak" : "Nie"}
+                  <strong>Wysłać pocztą:</strong>{' '}
+                  {selectedZlecenie.wyslac_poczta ? 'Tak' : 'Nie'}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold text-lg mb-1">Uwagi</h3>
-                <p>{selectedZlecenie.uwagi || "-"}</p>
+                <p>{selectedZlecenie.uwagi || '-'}</p>
               </div>
             </div>
 

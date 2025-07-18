@@ -466,6 +466,10 @@ export default function TransportTab() {
     }, 1000);
   };
 
+  console.log('selectedOrder.typ:', selectedOrder?.typ);
+  console.log('export_customs_option:', selectedOrder?.export_customs_option);
+  console.log('import_customs_option:', selectedOrder?.import_customs_option);
+
   return (
     <div className="flex gap-8 text-xs">
       {/* LEWA TABELA */}
@@ -951,12 +955,13 @@ export default function TransportTab() {
 
                 const found = foundExport || foundImport || foundPozostale;
 
-                if (!found) {
-                  alert('Nie znaleziono zlecenia w żadnej tabeli.');
-                  return;
+                if (foundExport) {
+                  setSelectedOrder({ ...foundExport, typ: 'export' });
+                } else if (foundImport) {
+                  setSelectedOrder({ ...foundImport, typ: 'import' });
+                } else if (foundPozostale) {
+                  setSelectedOrder({ ...foundPozostale, typ: 'pozostale' });
                 }
-
-                setSelectedOrder(found);
                 setShowModal(true);
                 console.log('✅ Pokazuję modal:', found);
 
@@ -1203,6 +1208,7 @@ export default function TransportTab() {
             <h2 className="text-2xl font-bold mb-4">Szczegóły zlecenia</h2>
 
             <div className="space-y-4 text-sm">
+              {/* Informacje podstawowe */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">
                   Informacje podstawowe
@@ -1222,6 +1228,7 @@ export default function TransportTab() {
                 </p>
               </div>
 
+              {/* Zleceniodawca */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Zleceniodawca</h3>
                 <p>
@@ -1246,6 +1253,7 @@ export default function TransportTab() {
                 </p>
               </div>
 
+              {/* Załadunek */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Załadunek</h3>
                 <p>
@@ -1264,6 +1272,7 @@ export default function TransportTab() {
                 </ul>
               </div>
 
+              {/* Rozładunek */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Rozładunek</h3>
                 <p>
@@ -1282,6 +1291,7 @@ export default function TransportTab() {
                 </ul>
               </div>
 
+              {/* Towar */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Towar</h3>
                 <p>
@@ -1298,18 +1308,146 @@ export default function TransportTab() {
                 </p>
               </div>
 
+              {/* Sekcja Cło */}
+              {selectedOrder && (
+                <>
+                  {(() => {
+                    let exportAddr = null;
+                    let importAddr = null;
+
+                    if (
+                      selectedOrder?.export_customs_address &&
+                      typeof selectedOrder.export_customs_address === 'string'
+                    ) {
+                      console.log(
+                        '👉 selectedOrder.export_customs_address:',
+                        selectedOrder.export_customs_address,
+                      );
+                      console.log(
+                        '👉 selectedOrder.import_customs_address:',
+                        selectedOrder.import_customs_address,
+                      );
+                      try {
+                        exportAddr = JSON.parse(
+                          selectedOrder.export_customs_address,
+                        );
+                      } catch (e) {
+                        console.warn(
+                          '❌ Błąd parsowania export_customs_address:',
+                          e,
+                        );
+                      }
+                    }
+
+                    if (
+                      selectedOrder?.import_customs_address &&
+                      typeof selectedOrder.import_customs_address === 'string'
+                    ) {
+                      try {
+                        importAddr = JSON.parse(
+                          selectedOrder.import_customs_address,
+                        );
+                      } catch (e) {
+                        console.warn(
+                          '❌ Błąd parsowania import_customs_address:',
+                          e,
+                        );
+                      }
+                    }
+
+                    return (
+                      (selectedOrder.export_customs_option ||
+                        selectedOrder.import_customs_option) && (
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Cło</h3>
+
+                          {/* Odprawa eksportowa */}
+                          {selectedOrder.export_customs_option && (
+                            <>
+                              <p>
+                                <strong>Odprawa celna eksportowa:</strong>{' '}
+                                {selectedOrder.export_customs_option}
+                              </p>
+                              <p>
+                                <strong>Adres export:</strong>
+                              </p>
+                              {selectedOrder.export_customs_option ===
+                                'adres' && exportAddr ? (
+                                <div className="text-sm leading-tight ml-5">
+                                  <p>{exportAddr.nazwa}</p>
+                                  <p>{exportAddr.ulica}</p>
+                                  <p>
+                                    {exportAddr.kod} {exportAddr.miasto}
+                                  </p>
+                                  <p>{exportAddr.panstwo}</p>
+                                  {exportAddr.uwagi && (
+                                    <p className="italic">
+                                      ({exportAddr.uwagi})
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-sm italic text-gray-500 ml-5">
+                                  W miejscu odbioru
+                                </p>
+                              )}
+                            </>
+                          )}
+
+                          {/* Odprawa importowa */}
+                          {selectedOrder.import_customs_option && (
+                            <>
+                              <p className="mt-2">
+                                <strong>Odprawa celna importowa:</strong>{' '}
+                                {selectedOrder.import_customs_option}
+                              </p>
+                              <p>
+                                <strong>Adres import:</strong>
+                              </p>
+                              {selectedOrder.import_customs_option ===
+                                'adres' && importAddr ? (
+                                <div className="text-sm leading-tight ml-5">
+                                  <p>{importAddr.nazwa}</p>
+                                  <p>{importAddr.ulica}</p>
+                                  <p>
+                                    {importAddr.kod} {importAddr.miasto}
+                                  </p>
+                                  <p>{importAddr.panstwo}</p>
+                                  {importAddr.uwagi && (
+                                    <p className="italic">
+                                      ({importAddr.uwagi})
+                                    </p>
+                                  )}
+                                </div>
+                              ) : selectedOrder.import_customs_option ===
+                                'GVMS' ? (
+                                <p className="text-sm italic text-gray-500 ml-5">
+                                  System GVMS
+                                </p>
+                              ) : (
+                                <p className="text-sm italic text-gray-500 ml-5">
+                                  W miejscu dostawy
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    );
+                  })()}
+                </>
+              )}
+
+              {/* Fracht */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Fracht</h3>
                 <p>
                   <strong>Cena:</strong> {selectedOrder.cena}{' '}
                   {selectedOrder.waluta}
                 </p>
-                <p>
-                  <strong>Termin płatności:</strong> {selectedOrder.termin_dni}{' '}
-                  dni
-                </p>
               </div>
 
+              {/* Uwagi */}
               <div>
                 <h3 className="font-semibold text-lg mb-1">Uwagi</h3>
                 <p>{selectedOrder.uwagi || '-'}</p>
