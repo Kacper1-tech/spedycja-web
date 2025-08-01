@@ -1075,10 +1075,19 @@ export default function TransportTab() {
                       o.zl_kod_pocztowy?.trim() ||
                       '-'}
                   </td>
-                  <td className="border p-2 text-center">
-                    {safeParse(o.adresy_dostawy_json)[0]?.kod ||
-                      o.zl_kod_rozladunku?.trim() ||
-                      '-'}
+                  <td className="border p-2 text-center align-middle whitespace-nowrap">
+                    {(() => {
+                      const adresy = safeParse(o.adresy_dostawy_json);
+                      if (!Array.isArray(adresy))
+                        return o.zl_kod_rozladunku?.trim() || '-';
+
+                      const kody = adresy
+                        .map((a) => a.kod?.trim())
+                        .filter(Boolean)
+                        .join('+');
+
+                      return kody || o.zl_kod_rozladunku?.trim() || '-';
+                    })()}
                   </td>
                   <td className="border p-2 text-center">
                     {formatDateShort(o.delivery_date_start)}
@@ -1126,10 +1135,19 @@ export default function TransportTab() {
                       o.zl_kod_pocztowy?.trim() ||
                       '-'}
                   </td>
-                  <td className="border p-2 text-center">
-                    {safeParse(o.adresy_dostawy_json)[0]?.kod ||
-                      o.zl_kod_pocztowy?.trim() ||
-                      '-'}
+                  <td className="border p-2 text-center align-middle whitespace-nowrap">
+                    {(() => {
+                      const adresy = safeParse(o.adresy_dostawy_json);
+                      if (!Array.isArray(adresy))
+                        return o.zl_kod_rozladunku?.trim() || '-';
+
+                      const kody = adresy
+                        .map((a) => a.kod?.trim())
+                        .filter(Boolean)
+                        .join('+');
+
+                      return kody || o.zl_kod_rozladunku?.trim() || '-';
+                    })()}
                   </td>
                   <td className="border p-2 text-center">
                     {formatDateShort(o.delivery_date_start)}
@@ -1178,10 +1196,19 @@ export default function TransportTab() {
                       o.zl_kod_pocztowy?.trim() ||
                       '-'}
                   </td>
-                  <td className="border p-2 text-center">
-                    {safeParse(o.adresy_dostawy_json)[0]?.kod ||
-                      o.zl_kod_pocztowy?.trim() ||
-                      '-'}
+                  <td className="border p-2 text-center align-middle whitespace-nowrap">
+                    {(() => {
+                      const adresy = safeParse(o.adresy_dostawy_json);
+                      if (!Array.isArray(adresy))
+                        return o.zl_kod_rozladunku?.trim() || '-';
+
+                      const kody = adresy
+                        .map((a) => a.kod?.trim())
+                        .filter(Boolean)
+                        .join('+');
+
+                      return kody || o.zl_kod_rozladunku?.trim() || '-';
+                    })()}
                   </td>
                   <td className="border p-2 text-center">
                     {formatDateShort(o.delivery_date_start)}

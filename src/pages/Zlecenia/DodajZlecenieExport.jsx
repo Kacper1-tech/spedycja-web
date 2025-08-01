@@ -351,15 +351,25 @@ export default function DodajZlecenieExport() {
       waluta: currency || originalZlecenie.waluta,
       custom_currency: customCurrency || originalZlecenie.custom_currency,
 
-      adresy_odbioru_json:
-        pickupAddresses?.length && pickupAddresses[0]?.nazwa
-          ? JSON.stringify(pickupAddresses)
-          : originalZlecenie.adresy_odbioru_json,
+      adresy_odbioru_json: pickupAddresses?.some(
+        (a) =>
+          a.nazwa?.trim() ||
+          a.kod?.trim() ||
+          a.ulica?.trim() ||
+          a.miasto?.trim(),
+      )
+        ? JSON.stringify(pickupAddresses)
+        : originalZlecenie.adresy_odbioru_json,
 
-      adresy_dostawy_json:
-        deliveryAddresses?.length && deliveryAddresses[0]?.nazwa
-          ? JSON.stringify(deliveryAddresses)
-          : originalZlecenie.adresy_dostawy_json,
+      adresy_dostawy_json: deliveryAddresses?.some(
+        (a) =>
+          a.nazwa?.trim() ||
+          a.kod?.trim() ||
+          a.ulica?.trim() ||
+          a.miasto?.trim(),
+      )
+        ? JSON.stringify(deliveryAddresses)
+        : originalZlecenie.adresy_dostawy_json,
 
       palety: palety || originalZlecenie.palety,
       waga: waga || originalZlecenie.waga,
