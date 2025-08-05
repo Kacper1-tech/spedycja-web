@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import React from 'react';
 import { getCurrencySymbol } from '../utils/currency';
 
 const safeParse = (val) => {
@@ -476,7 +475,7 @@ export default function TransportTab() {
       <div className="w-1/2">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-base font-bold">
-            Plan Transportu
+            <span>Plan Transportu</span>
             <button
               onClick={handleRefresh}
               className="flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-full text-xs shadow"
@@ -562,17 +561,38 @@ export default function TransportTab() {
                           .toLowerCase()
                           .includes(selectedOrderNumber.toLowerCase()),
                       )
-                      .map((o) => (
-                        <div
-                          key={o.id}
-                          onClick={() => {
-                            setSelectedOrderNumber(o.numer_zlecenia);
-                          }}
-                          className="p-1 hover:bg-gray-200 cursor-pointer"
-                        >
-                          {o.numer_zlecenia}
-                        </div>
-                      ))}
+                      .map((o) => {
+                        const kody = (() => {
+                          const adresy = safeParse(o.adresy_dostawy_json);
+                          if (!Array.isArray(adresy))
+                            return o.zl_kod_rozladunku?.trim() || '-';
+
+                          return (
+                            adresy
+                              .map((a) => a.kod?.trim())
+                              .filter(Boolean)
+                              .join('+') ||
+                            o.zl_kod_rozladunku?.trim() ||
+                            '-'
+                          );
+                        })();
+
+                        const dane = `${o.zl_nazwa || ''} ${kody}`;
+
+                        return (
+                          <button
+                            type="button"
+                            key={o.id}
+                            onClick={() => {
+                              setSelectedOrderNumber(o.numer_zlecenia);
+                              setNewExportData(dane);
+                            }}
+                            className="w-full text-left p-1 hover:bg-gray-200 cursor-pointer"
+                          >
+                            {o.numer_zlecenia}
+                          </button>
+                        );
+                      })}
                   </div>
                 )}
 
@@ -633,17 +653,38 @@ export default function TransportTab() {
                           .toLowerCase()
                           .includes(newImport.toLowerCase()),
                       )
-                      .map((o) => (
-                        <div
-                          key={o.id}
-                          onClick={() => {
-                            setNewImport(o.numer_zlecenia);
-                          }}
-                          className="p-1 hover:bg-gray-200 cursor-pointer"
-                        >
-                          {o.numer_zlecenia}
-                        </div>
-                      ))}
+                      .map((o) => {
+                        const kody = (() => {
+                          const adresy = safeParse(o.adresy_dostawy_json);
+                          if (!Array.isArray(adresy))
+                            return o.zl_kod_rozladunku?.trim() || '-';
+
+                          return (
+                            adresy
+                              .map((a) => a.kod?.trim())
+                              .filter(Boolean)
+                              .join('+') ||
+                            o.zl_kod_rozladunku?.trim() ||
+                            '-'
+                          );
+                        })();
+
+                        const dane = `${o.zl_nazwa || ''} ${kody}`;
+
+                        return (
+                          <button
+                            type="button"
+                            key={o.id}
+                            onClick={() => {
+                              setNewImport(o.numer_zlecenia);
+                              setNewImportData(dane);
+                            }}
+                            className="w-full text-left p-1 hover:bg-gray-200 cursor-pointer"
+                          >
+                            {o.numer_zlecenia}
+                          </button>
+                        );
+                      })}
                   </div>
                 )}
 
@@ -824,7 +865,8 @@ export default function TransportTab() {
                       <td className="border p-2">{row.kierowca}</td>
                       <td className="border p-2">
                         {(row.export || []).map((ex, idx) => (
-                          <span
+                          <button
+                            type="button"
                             key={idx}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -840,20 +882,21 @@ export default function TransportTab() {
                               setNewExportData(ex.dane);
                               setSelectedOrderNumber(ex.numer);
                             }}
-                            className="underline cursor-pointer text-blue-600 hover:text-blue-800 mr-1"
+                            className="underline text-left text-blue-600 hover:text-blue-800 mr-1"
                           >
                             {ex.dane}
-                          </span>
+                          </button>
                         ))}
                       </td>
                       <td className="border p-2">
                         {(row.import || []).map((imp, idx) => (
-                          <span
+                          <button
+                            type="button"
                             key={idx}
                             onClick={(e) => {
                               e.stopPropagation();
                               console.log('🟡 Kliknięto IMPORT:', imp);
-                              setSelectedRow(row); // ✅ KLUCZOWA LINIA!
+                              setSelectedRow(row);
                               setContextMenu({
                                 show: true,
                                 x: e.pageX,
@@ -869,10 +912,10 @@ export default function TransportTab() {
                               );
                               setNewImport(imp.numer);
                             }}
-                            className="underline cursor-pointer text-pink-600 hover:text-pink-800 mr-1"
+                            className="underline text-left text-pink-600 hover:text-pink-800 mr-1"
                           >
                             {imp.dane}
-                          </span>
+                          </button>
                         ))}
                       </td>
                       <td className="border p-2">{row.uwagi}</td>
@@ -1431,31 +1474,43 @@ export default function TransportTab() {
                               <p>
                                 <strong>Adres import:</strong>
                               </p>
-                              {selectedOrder.import_customs_option ===
-                                'adres' && importAddr ? (
-                                <div className="text-sm leading-tight ml-5">
-                                  <p>{importAddr.nazwa}</p>
-                                  <p>{importAddr.ulica}</p>
-                                  <p>
-                                    {importAddr.kod} {importAddr.miasto}
-                                  </p>
-                                  <p>{importAddr.panstwo}</p>
-                                  {importAddr.uwagi && (
-                                    <p className="italic">
-                                      ({importAddr.uwagi})
+                              {(() => {
+                                if (
+                                  selectedOrder.import_customs_option ===
+                                    'adres' &&
+                                  importAddr
+                                ) {
+                                  return (
+                                    <div className="text-sm leading-tight ml-5">
+                                      <p>{importAddr.nazwa}</p>
+                                      <p>{importAddr.ulica}</p>
+                                      <p>
+                                        {importAddr.kod} {importAddr.miasto}
+                                      </p>
+                                      <p>{importAddr.panstwo}</p>
+                                      {importAddr.uwagi && (
+                                        <p className="italic">
+                                          ({importAddr.uwagi})
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                } else if (
+                                  selectedOrder.import_customs_option === 'GVMS'
+                                ) {
+                                  return (
+                                    <p className="text-sm italic text-gray-500 ml-5">
+                                      System GVMS
                                     </p>
-                                  )}
-                                </div>
-                              ) : selectedOrder.import_customs_option ===
-                                'GVMS' ? (
-                                <p className="text-sm italic text-gray-500 ml-5">
-                                  System GVMS
-                                </p>
-                              ) : (
-                                <p className="text-sm italic text-gray-500 ml-5">
-                                  W miejscu dostawy
-                                </p>
-                              )}
+                                  );
+                                } else {
+                                  return (
+                                    <p className="text-sm italic text-gray-500 ml-5">
+                                      W miejscu dostawy
+                                    </p>
+                                  );
+                                }
+                              })()}
                             </>
                           )}
                         </div>

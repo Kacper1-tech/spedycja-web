@@ -1,10 +1,10 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Kontrahenci() {
   const tiles = [
-    { label: "Lista kontrahentów", to: "/kontrahenci/lista" },
-    { label: "Dodaj kontrahenta", to: "/kontrahenci/dodaj" },
+    { label: 'Lista kontrahentów', to: '/kontrahenci/lista' },
+    { label: 'Dodaj kontrahenta', to: '/kontrahenci/dodaj' },
   ];
 
   return (

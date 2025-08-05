@@ -1,10 +1,10 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Ksiegowosc() {
   const tiles = [
-    { label: "Lista Faktur", to: "/ksiegowosc/faktury/kosztowe/lista" },
-    { label: "Dodaj Fakturę", to: "/ksiegowosc/faktury/kosztowe/dodaj" },
+    { label: 'Lista Faktur', to: '/ksiegowosc/faktury/kosztowe/lista' },
+    { label: 'Dodaj Fakturę', to: '/ksiegowosc/faktury/kosztowe/dodaj' },
   ];
 
   return (

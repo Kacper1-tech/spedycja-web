@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { getCurrencySymbol } from '../../utils/currency';
+import { useZaktualizowaniImportowiKontrahenci } from '../../hooks/useZaktualizowaniImportowiKontrahenci';
 
 export default function ListaZlecenImport() {
   const navigate = useNavigate();
@@ -12,22 +13,11 @@ export default function ListaZlecenImport() {
   const [showModal, setShowModal] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const [allSelected, setAllSelected] = useState(false);
+  const { zlecenia } = useZaktualizowaniImportowiKontrahenci();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data, error } = await supabase
-        .from('zlecenia_import')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('Błąd ładowania danych:', error);
-      } else {
-        setRows(data);
-        setFilteredRows(data);
-      }
-    };
-    fetchData();
-  }, []);
+    setFilteredRows(zlecenia);
+  }, [zlecenia]);
 
   const handleSelectRow = (id) => {
     setSelectedRows((prev) =>
@@ -422,32 +412,48 @@ export default function ListaZlecenImport() {
                 <p>
                   <strong>Adres export:</strong>
                 </p>
-                {selectedZlecenie.export_customs_option === 'adres' &&
-                exportAddr ? (
-                  <div className="text-sm leading-tight ml-5">
-                    <p>{exportAddr.nazwa}</p>
-                    <p>{exportAddr.ulica}</p>
-                    <p>
-                      {exportAddr.kod} {exportAddr.miasto}
+                {(() => {
+                  const option = selectedZlecenie.export_customs_option;
+
+                  if (option === 'adres' && exportAddr) {
+                    return (
+                      <div className="text-sm leading-tight ml-5">
+                        <p>{exportAddr.nazwa}</p>
+                        <p>{exportAddr.ulica}</p>
+                        <p>
+                          {exportAddr.kod} {exportAddr.miasto}
+                        </p>
+                        <p>{exportAddr.panstwo}</p>
+                        {exportAddr.uwagi && (
+                          <p className="italic">({exportAddr.uwagi})</p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (option === 'sevington') {
+                    return (
+                      <p className="text-sm italic text-gray-500 ml-5">
+                        Sevington IBF
+                      </p>
+                    );
+                  }
+
+                  if (option === 'smartborder') {
+                    return (
+                      <p className="text-sm italic text-gray-500 ml-5">
+                        Smart Border
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <p className="text-sm italic text-gray-500 ml-5">
+                      W miejscu odbioru towaru
                     </p>
-                    <p>{exportAddr.panstwo}</p>
-                    {exportAddr.uwagi && (
-                      <p className="italic">({exportAddr.uwagi})</p>
-                    )}
-                  </div>
-                ) : selectedZlecenie.export_customs_option === 'sevington' ? (
-                  <p className="text-sm italic text-gray-500 ml-5">
-                    Sevington IBF
-                  </p>
-                ) : selectedZlecenie.export_customs_option === 'smartborder' ? (
-                  <p className="text-sm italic text-gray-500 ml-5">
-                    Smart Border
-                  </p>
-                ) : (
-                  <p className="text-sm italic text-gray-500 ml-5">
-                    W miejscu odbioru towaru
-                  </p>
-                )}
+                  );
+                })()}
+
                 <p>
                   <strong>Odprawa celna importowa:</strong>{' '}
                   {selectedZlecenie.import_customs_option}

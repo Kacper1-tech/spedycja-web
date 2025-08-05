@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { supabase } from "../supabaseClient";
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { supabase } from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
+    setError('');
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,7 +20,7 @@ export default function Login() {
     if (error) {
       setError(error.message);
     } else {
-      navigate("/");
+      navigate('/');
     }
   };
 
@@ -38,10 +38,14 @@ export default function Login() {
 
         <h2 className="text-2xl font-bold mb-6 text-center">Logowanie</h2>
 
-        <label className="block mb-2 text-sm font-medium text-gray-700 w-full text-left">
+        <label
+          htmlFor="email"
+          className="block mb-2 text-sm font-medium text-gray-700 w-full text-left"
+        >
           E-mail
         </label>
         <input
+          id="email"
           type="email"
           placeholder="Podaj e-mail"
           value={email}

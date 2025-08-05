@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import { refreshKontrahenci } from '../../hooks/useKontrahenci';
 
 export default function KontrahenciTab() {
   const [kontrahenci, setKontrahenci] = useState([]);
@@ -12,6 +13,13 @@ export default function KontrahenciTab() {
   });
   const [selectedKontrahent, setSelectedKontrahent] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [editedKontrahent, setEditedKontrahent] = useState(null);
+
+  useEffect(() => {
+    if (selectedKontrahent) {
+      setEditedKontrahent({ ...selectedKontrahent });
+    }
+  }, [selectedKontrahent]);
 
   useEffect(() => {
     fetchKontrahenci();
@@ -49,6 +57,91 @@ export default function KontrahenciTab() {
       setShowModal(false);
       fetchKontrahenci(); // odświeżenie listy
     }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!editedKontrahent) return;
+
+    const { id } = editedKontrahent;
+
+    const fieldsToUpdate = {
+      grupa: editedKontrahent.grupa || null,
+      nazwa: editedKontrahent.nazwa || null,
+      adres_json: editedKontrahent.adres_json || {},
+      identyfikatory_json: editedKontrahent.identyfikatory_json || {},
+      kontakty_json: editedKontrahent.kontakty_json || [],
+    };
+
+    const { error } = await supabase
+      .from('kontrahenci')
+      .update(fieldsToUpdate)
+      .eq('id', id);
+
+    if (error) {
+      alert('Błąd podczas zapisu');
+      console.error(error);
+      return;
+    }
+
+    const updateZlecenia = {
+      zl_nazwa: fieldsToUpdate.nazwa,
+      zl_ulica: fieldsToUpdate.adres_json?.ulica_nr || null,
+      zl_kod_pocztowy: fieldsToUpdate.adres_json?.kod_pocztowy || null,
+      zl_miasto: fieldsToUpdate.adres_json?.miasto || null,
+      zl_panstwo: fieldsToUpdate.adres_json?.panstwo || null,
+      zl_vat: fieldsToUpdate.identyfikatory_json?.vat || null,
+      zl_nip: fieldsToUpdate.identyfikatory_json?.nip || null,
+      zl_regon: fieldsToUpdate.identyfikatory_json?.regon || null,
+      zl_eori: fieldsToUpdate.identyfikatory_json?.eori || null,
+      zl_pesel: fieldsToUpdate.identyfikatory_json?.pesel || null,
+      osoba_kontaktowa:
+        fieldsToUpdate.kontakty_json?.[0]?.imie_nazwisko || null,
+      telefon_kontaktowy: fieldsToUpdate.kontakty_json?.[0]?.telefon || null,
+      email_kontaktowy: fieldsToUpdate.kontakty_json?.[0]?.email || null,
+    };
+
+    // 🔁 Zaktualizuj zlecenia eksportowe
+    const { error: zlecExportError } = await supabase
+      .from('zlecenia_export')
+      .update(updateZlecenia)
+      .eq('kontrahent_id', id);
+
+    if (zlecExportError) {
+      console.error('Błąd aktualizacji zleceń eksportowych:', zlecExportError);
+    }
+
+    // 🔁 Zaktualizuj zlecenia importowe
+    const { error: zlecImportError } = await supabase
+      .from('zlecenia_import')
+      .update(updateZlecenia)
+      .eq('kontrahent_id', id);
+
+    if (zlecImportError) {
+      console.error('Błąd aktualizacji zleceń importowych:', zlecImportError);
+    }
+
+    // 🔁 Zaktualizuj zlecenia pozostałe
+    const { error: zlecPozostaleError } = await supabase
+      .from('zlecenia_pozostale')
+      .update(updateZlecenia)
+      .eq('kontrahent_id', id);
+
+    if (zlecPozostaleError) {
+      console.error(
+        'Błąd aktualizacji zleceń pozostałych:',
+        zlecPozostaleError,
+      );
+    }
+
+    alert('Zapisano zmiany');
+    await refreshKontrahenci();
+
+    // 🔁 Odśwież eksport i import
+    window.dispatchEvent(new Event('refreshZleceniaExport'));
+    window.dispatchEvent(new Event('refreshZleceniaImport'));
+    window.dispatchEvent(new Event('refreshZleceniaPozostale'));
+
+    setShowModal(false);
   };
 
   const filteredKontrahenci = kontrahenci.filter((k) => {
@@ -190,65 +283,283 @@ export default function KontrahenciTab() {
               <h2 className="text-lg font-bold mb-4">Szczegóły kontrahenta</h2>
 
               <div className="space-y-2 text-sm">
-                <p>
-                  <strong>Grupa:</strong> {selectedKontrahent.grupa}
-                </p>
-                <p>
-                  <strong>Nazwa:</strong> {selectedKontrahent.nazwa}
-                </p>
-                <p>
-                  <strong>Adres:</strong>
-                  {selectedKontrahent.adres_json
-                    ? `${selectedKontrahent.adres_json.ulica_nr || ''}, ${selectedKontrahent.adres_json.kod_pocztowy || ''} ${selectedKontrahent.adres_json.miasto || ''}, ${selectedKontrahent.adres_json.panstwo || ''}`
-                    : '-'}
-                </p>
-                <p>
-                  <strong>VAT:</strong>{' '}
-                  {selectedKontrahent.identyfikatory_json?.vat || '-'}
-                </p>
-                <p>
-                  <strong>NIP:</strong>{' '}
-                  {selectedKontrahent.identyfikatory_json?.nip || '-'}
-                </p>
-                <p>
-                  <strong>REGON:</strong>{' '}
-                  {selectedKontrahent.identyfikatory_json?.regon || '-'}
-                </p>
-                <p>
-                  <strong>EORI:</strong>{' '}
-                  {selectedKontrahent.identyfikatory_json?.eori || '-'}
-                </p>
-                <p>
-                  <strong>PESEL:</strong>{' '}
-                  {selectedKontrahent.identyfikatory_json?.pesel || '-'}
-                </p>
+                <div>
+                  <label htmlFor="kontrahent-grupa" className="font-semibold">
+                    Grupa:
+                  </label>
+                  <input
+                    id="kontrahent-grupa"
+                    type="text"
+                    value={editedKontrahent?.grupa || ''}
+                    onChange={(e) =>
+                      setEditedKontrahent({
+                        ...editedKontrahent,
+                        grupa: e.target.value,
+                      })
+                    }
+                    className="border p-1 w-full"
+                  />
+
+                  {/* Nazwa */}
+                  <div>
+                    <label htmlFor="kontrahent-nazwa" className="font-semibold">
+                      Nazwa:
+                    </label>
+                    <input
+                      id="kontrahent-nazwa"
+                      type="text"
+                      value={editedKontrahent?.nazwa || ''}
+                      onChange={(e) =>
+                        setEditedKontrahent({
+                          ...editedKontrahent,
+                          nazwa: e.target.value,
+                        })
+                      }
+                      className="border p-1 w-full"
+                    />
+                  </div>
+
+                  {/* Adres */}
+                  <div>
+                    <label htmlFor="adres-ulica" className="font-semibold">
+                      Adres:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        id="adres-ulica"
+                        type="text"
+                        placeholder="Ulica i nr"
+                        value={editedKontrahent?.adres_json?.ulica_nr || ''}
+                        onChange={(e) => {
+                          const updated = {
+                            ...editedKontrahent.adres_json,
+                            ulica_nr: e.target.value,
+                          };
+                          setEditedKontrahent({
+                            ...editedKontrahent,
+                            adres_json: updated,
+                          });
+                        }}
+                        className="border p-1"
+                      />
+
+                      <input
+                        type="text"
+                        placeholder="Kod pocztowy"
+                        value={editedKontrahent?.adres_json?.kod_pocztowy || ''}
+                        onChange={(e) => {
+                          const updated = {
+                            ...editedKontrahent.adres_json,
+                            kod_pocztowy: e.target.value,
+                          };
+                          setEditedKontrahent({
+                            ...editedKontrahent,
+                            adres_json: updated,
+                          });
+                        }}
+                        className="border p-1"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Miasto"
+                        value={editedKontrahent?.adres_json?.miasto || ''}
+                        onChange={(e) => {
+                          const updated = {
+                            ...editedKontrahent.adres_json,
+                            miasto: e.target.value,
+                          };
+                          setEditedKontrahent({
+                            ...editedKontrahent,
+                            adres_json: updated,
+                          });
+                        }}
+                        className="border p-1"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Państwo"
+                        value={editedKontrahent?.adres_json?.panstwo || ''}
+                        onChange={(e) => {
+                          const updated = {
+                            ...editedKontrahent.adres_json,
+                            panstwo: e.target.value,
+                          };
+                          setEditedKontrahent({
+                            ...editedKontrahent,
+                            adres_json: updated,
+                          });
+                        }}
+                        className="border p-1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Identyfikatory */}
+                  <div>
+                    <p className="font-semibold">Identyfikatory:</p>
+                    {['vat', 'nip', 'regon', 'eori', 'pesel'].map((key) =>
+                      editedKontrahent?.identyfikatory_json?.[key] ? (
+                        <div key={key}>
+                          <label className="text-sm capitalize">
+                            {key.toUpperCase()}:
+                          </label>
+                          <input
+                            type="text"
+                            value={editedKontrahent.identyfikatory_json[key]}
+                            onChange={(e) => {
+                              const updated = {
+                                ...editedKontrahent.identyfikatory_json,
+                                [key]: e.target.value,
+                              };
+                              setEditedKontrahent({
+                                ...editedKontrahent,
+                                identyfikatory_json: updated,
+                              });
+                            }}
+                            className="border p-1 w-full"
+                          />
+                        </div>
+                      ) : null,
+                    )}
+                  </div>
+                </div>
 
                 <h3 className="mt-4 font-bold">Osoby kontaktowe:</h3>
                 <div className="space-y-2">
-                  {selectedKontrahent.kontakty_json &&
-                  selectedKontrahent.kontakty_json.length > 0 ? (
-                    selectedKontrahent.kontakty_json.map((kontakt, i) => (
-                      <div key={i} className="p-2 border rounded">
-                        <p>
-                          <strong>Imię i nazwisko:</strong>{' '}
-                          {kontakt.imie_nazwisko || '-'}
-                        </p>
-                        <p>
-                          <strong>Telefon:</strong> {kontakt.telefon || '-'}
-                        </p>
-                        <p>
-                          <strong>Email:</strong> {kontakt.email || '-'}
-                        </p>
+                  {editedKontrahent?.kontakty_json?.length > 0 ? (
+                    editedKontrahent.kontakty_json.map((kontakt, index) => (
+                      <div
+                        key={index}
+                        className="p-3 border rounded relative bg-gray-50 space-y-2"
+                      >
+                        <div className="absolute top-1 right-1">
+                          <button
+                            className="text-red-500 hover:text-red-700"
+                            title="Usuń kontakt"
+                            onClick={() => {
+                              const updated =
+                                editedKontrahent.kontakty_json.filter(
+                                  (_, i) => i !== index,
+                                );
+                              setEditedKontrahent({
+                                ...editedKontrahent,
+                                kontakty_json: updated,
+                              });
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div>
+                          <label
+                            className="text-sm"
+                            htmlFor={`kontakt-imie-${index}`}
+                          >
+                            Imię i nazwisko:
+                          </label>
+                          <input
+                            id={`kontakt-imie-${index}`}
+                            type="text"
+                            value={kontakt.imie_nazwisko || ''}
+                            onChange={(e) => {
+                              const updated = [
+                                ...editedKontrahent.kontakty_json,
+                              ];
+                              updated[index].imie_nazwisko = e.target.value;
+                              setEditedKontrahent({
+                                ...editedKontrahent,
+                                kontakty_json: updated,
+                              });
+                            }}
+                            className="border p-1 w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="text-sm"
+                            htmlFor={`kontakt-telefon-${index}`}
+                          >
+                            Telefon:
+                          </label>
+                          <input
+                            id={`kontakt-telefon-${index}`}
+                            type="text"
+                            value={kontakt.telefon || ''}
+                            onChange={(e) => {
+                              const updated = [
+                                ...editedKontrahent.kontakty_json,
+                              ];
+                              updated[index].telefon = e.target.value;
+                              setEditedKontrahent({
+                                ...editedKontrahent,
+                                kontakty_json: updated,
+                              });
+                            }}
+                            className="border p-1 w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="text-sm"
+                            htmlFor={`kontakt-email-${index}`}
+                          >
+                            Email:
+                          </label>
+                          <input
+                            id={`kontakt-email-${index}`}
+                            type="email"
+                            value={kontakt.email || ''}
+                            onChange={(e) => {
+                              const updated = [
+                                ...editedKontrahent.kontakty_json,
+                              ];
+                              updated[index].email = e.target.value;
+                              setEditedKontrahent({
+                                ...editedKontrahent,
+                                kontakty_json: updated,
+                              });
+                            }}
+                            className="border p-1 w-full"
+                          />
+                        </div>
                       </div>
                     ))
                   ) : (
                     <p className="italic text-gray-500">Brak kontaktów</p>
                   )}
+
+                  <button
+                    className="mt-2 text-sm text-blue-600 hover:underline"
+                    onClick={() => {
+                      const nowyKontakt = {
+                        imie_nazwisko: '',
+                        telefon: '',
+                        email: '',
+                      };
+                      const aktualne = editedKontrahent.kontakty_json || [];
+                      setEditedKontrahent({
+                        ...editedKontrahent,
+                        kontakty_json: [...aktualne, nowyKontakt],
+                      });
+                    }}
+                  >
+                    ➕ Dodaj kontakt
+                  </button>
                 </div>
               </div>
             </div>
 
             <div className="p-4 border-t flex justify-between bg-white">
+              <button
+                onClick={handleSaveChanges}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Zapisz zmiany
+              </button>
+
               <button
                 onClick={handleDeleteKontrahent}
                 className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"

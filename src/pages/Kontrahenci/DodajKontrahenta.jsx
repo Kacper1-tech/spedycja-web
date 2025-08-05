@@ -1,65 +1,65 @@
-import { useState } from "react";
-import { supabase } from "../../supabaseClient";
+import { useState } from 'react';
+import { supabase } from '../../supabaseClient';
 
 export default function DodajKontrahenta() {
-  const [grupa, setGrupa] = useState("");
-  const [nazwa, setNazwa] = useState("");
-  const [ulicaNr, setUlicaNr] = useState("");
-  const [miasto, setMiasto] = useState("");
-  const [kodPocztowy, setKodPocztowy] = useState("");
-  const [panstwo, setPanstwo] = useState("");
-  const [vat, setVat] = useState("");
-  const [nip, setNip] = useState("");
-  const [regon, setRegon] = useState("");
-  const [eori, setEori] = useState("");
-  const [pesel, setPesel] = useState("");
-  const [imieNazwisko, setImieNazwisko] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefon, setTelefon] = useState("");
+  const [grupa, setGrupa] = useState('');
+  const [nazwa, setNazwa] = useState('');
+  const [ulicaNr, setUlicaNr] = useState('');
+  const [miasto, setMiasto] = useState('');
+  const [kodPocztowy, setKodPocztowy] = useState('');
+  const [panstwo, setPanstwo] = useState('');
+  const [vat, setVat] = useState('');
+  const [nip, setNip] = useState('');
+  const [regon, setRegon] = useState('');
+  const [eori, setEori] = useState('');
+  const [pesel, setPesel] = useState('');
+  const [imieNazwisko, setImieNazwisko] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefon, setTelefon] = useState('');
 
   const handleAddKontrahent = async () => {
-    const { error } = await supabase.from("kontrahenci").insert({
+    const { error } = await supabase.from('kontrahenci').insert({
       grupa,
       nazwa,
       adres_json: {
         ulica_nr: ulicaNr,
         miasto,
         kod_pocztowy: kodPocztowy,
-        panstwo
+        panstwo,
       },
       identyfikatory_json: {
         vat,
         nip,
         regon,
         eori,
-        pesel
+        pesel,
       },
       kontakty_json: {
         imie_nazwisko: imieNazwisko,
         email,
-        telefon
-      }
+        telefon,
+      },
     });
 
     if (error) {
       console.error(error);
     } else {
       // Czyść formularz
-      setGrupa("");
-      setNazwa("");
-      setUlicaNr("");
-      setMiasto("");
-      setKodPocztowy("");
-      setPanstwo("");
-      setVat("");
-      setNip("");
-      setRegon("");
-      setEori("");
-      setPesel("");
-      setImieNazwisko("");
-      setEmail("");
-      setTelefon("");
-      alert("Kontrahent dodany!");
+      setGrupa('');
+      setNazwa('');
+      setUlicaNr('');
+      setMiasto('');
+      setKodPocztowy('');
+      setPanstwo('');
+      setVat('');
+      setNip('');
+      setRegon('');
+      setEori('');
+      setPesel('');
+      setImieNazwisko('');
+      setEmail('');
+      setTelefon('');
+      alert('Kontrahent dodany!');
     }
   };
 

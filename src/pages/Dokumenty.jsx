@@ -1,53 +1,53 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 export default function Dokumenty() {
   const [documents, setDocuments] = useState([]);
   const [file, setFile] = useState(null);
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState('');
   const [user, setUser] = useState(null);
 
-	useEffect(() => {
-		const fetchUserAndDocuments = async () => {
-			const { data: userData } = await supabase.auth.getUser();
-			if (userData?.user) {
-				setUser(userData.user);
-			}
-			fetchDocuments(); // <-- ZAWSZE
-		};
-		fetchUserAndDocuments();
-	}, []);
+  useEffect(() => {
+    const fetchUserAndDocuments = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        setUser(userData.user);
+      }
+      fetchDocuments(); // <-- ZAWSZE
+    };
+    fetchUserAndDocuments();
+  }, []);
 
   const fetchDocuments = async () => {
     const { data, error } = await supabase
-      .from("documents")
-      .select("*")
-      .order("uploaded_at", { ascending: false });
+      .from('documents')
+      .select('*')
+      .order('uploaded_at', { ascending: false });
     if (!error) setDocuments(data);
-    else console.error("Błąd:", error);
+    else console.error('Błąd:', error);
   };
 
   const handleUpload = async () => {
     if (!file || !user) return;
 
-    const ext = file.name.split(".").pop();
+    const ext = file.name.split('.').pop();
     const fileName = `${Date.now()}.${ext}`;
     const filePath = `${user.id}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("documents")
+      .from('documents')
       .upload(filePath, file);
 
     if (uploadError) {
-      console.error("Upload error:", uploadError.message);
+      console.error('Upload error:', uploadError.message);
       return;
     }
 
     const { data: urlData } = supabase.storage
-      .from("documents")
+      .from('documents')
       .getPublicUrl(filePath);
 
-    const { error: insertError } = await supabase.from("documents").insert([
+    const { error: insertError } = await supabase.from('documents').insert([
       {
         user_id: user.id,
         filename: file.name,
@@ -58,7 +58,7 @@ export default function Dokumenty() {
 
     if (!insertError) {
       setFile(null);
-      setDescription("");
+      setDescription('');
       fetchDocuments();
     }
   };
@@ -66,34 +66,34 @@ export default function Dokumenty() {
   const handleDelete = async (doc) => {
     if (!window.confirm(`Usunąć plik ${doc.filename}?`)) return;
 
-    const filePath = `${doc.user_id}/${doc.file_url.split("/").pop()}`;
+    const filePath = `${doc.user_id}/${doc.file_url.split('/').pop()}`;
     const { error: storageError } = await supabase.storage
-      .from("documents")
+      .from('documents')
       .remove([filePath]);
 
     if (storageError) {
-      console.error("Błąd usuwania pliku:", storageError);
+      console.error('Błąd usuwania pliku:', storageError);
       return;
     }
 
     const { error: deleteError } = await supabase
-      .from("documents")
+      .from('documents')
       .delete()
-      .eq("id", doc.id);
+      .eq('id', doc.id);
 
     if (!deleteError) fetchDocuments();
   };
 
   const getFileIcon = (filename) => {
-    const ext = filename.split(".").pop().toLowerCase();
-    if (["pdf"].includes(ext)) return "📄";
-    if (["jpg", "jpeg", "png"].includes(ext)) return "📷";
-    if (["zip", "rar"].includes(ext)) return "📁";
-    return "📎";
+    const ext = filename.split('.').pop().toLowerCase();
+    if (['pdf'].includes(ext)) return '📄';
+    if (['jpg', 'jpeg', 'png'].includes(ext)) return '📷';
+    if (['zip', 'rar'].includes(ext)) return '📁';
+    return '📎';
   };
 
   const handleDownload = (url) => {
-    window.open(url, "_blank");
+    window.open(url, '_blank');
   };
 
   return (
@@ -142,14 +142,14 @@ export default function Dokumenty() {
                   <span>{getFileIcon(doc.filename)}</span>
                   <span>{doc.filename}</span>
                 </td>
-                <td className="p-3">{doc.description || "-"}</td>
+                <td className="p-3">{doc.description || '-'}</td>
                 <td className="p-3 whitespace-nowrap text-gray-600">
-                  {new Date(doc.uploaded_at).toLocaleString("pl-PL", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                  {new Date(doc.uploaded_at).toLocaleString('pl-PL', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </td>
                 <td className="p-3 flex gap-2">

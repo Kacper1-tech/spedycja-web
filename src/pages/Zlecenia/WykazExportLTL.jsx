@@ -109,8 +109,6 @@ export default function WykazExportLTL() {
 
   const handlePrintForWeek = (weekNumber) => {
     const rowsInWeek = groupedRows[weekNumber];
-
-    // 🔸 Filtruj tylko zaznaczone wiersze w danym tygodniu
     const selectedRowsInWeek = rowsInWeek.filter((row) =>
       selectedRows.includes(row.id),
     );
@@ -120,89 +118,109 @@ export default function WykazExportLTL() {
       return;
     }
 
-    const html = `
-      <html>
-        <head>
-          <title>Wykaz LTL - Tydzień ${weekNumber}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 40px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 12pt;
-            }
-            th, td {
-              border: 1px solid #333;
-              padding: 8px 12px;
-              text-align: center;
-            }
-            th {
-              background-color: #f0f0f0;
-            }
-            tr:nth-child(even) {
-              background-color: #fafafa;
-            }
-          </style>
-        </head>
-        <body>
-          <h1>Wykaz LTL - Tydzień ${weekNumber}</h1>
-          <table>
-            <thead>
-              <tr>
-                <th>Zleceniodawca</th>
-                <th>Data załadunku</th>
-                <th>Adres załadunku</th>
-                <th>Cło</th>
-                <th>Ilość palet</th>
-                <th>Wymiar</th>
-                <th>LDM</th>
-                <th>Waga</th>
-                <th>Adres rozładunku</th>
-                <th>Data rozładunku</th>
-                <th>Cena</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${selectedRowsInWeek
-                .map(
-                  (row) => `
-                <tr>
-                  <td>${row.zl_nazwa}</td>
-                  <td>${formatDate(row.pickup_date_start)}</td>
-                  <td>${safeParse(row.adresy_odbioru_json)[0]?.miasto || row.zl_miasto || '-'}</td>
-                  <td>${
-                    row.export_customs_option === 'adres'
-                      ? safeParse(row.export_customs_adres_json)?.miasto || '-'
-                      : row.export_customs_option === 'odbior'
-                        ? 'Na zał'
-                        : '-'
-                  }</td>
-                  <td>${row.palety || '-'}</td>
-                  <td>${row.wymiar || '-'}</td>
-                  <td>${row.ldm || '-'}</td>
-                  <td>${row.waga || '-'}</td>
-                  <td>${safeParse(row.adresy_dostawy_json)[0]?.kod || row.zl_kod_pocztowy || '-'}</td>
-                  <td>${formatDate(row.delivery_date_start)}</td>
-                  <td>${row.cena} ${getCurrencySymbol(row.waluta)}</td>
-                </tr>
-              `,
-                )
-                .join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
+    const formatCustoms = (row) => {
+      if (row.export_customs_option === 'adres') {
+        return safeParse(row.export_customs_adres_json)?.miasto || '-';
+      }
+      if (row.export_customs_option === 'odbior') {
+        return 'Na zał';
+      }
+      return '-';
+    };
+
+    const rowsHTML = selectedRowsInWeek
+      .map((row) => {
+        const odbiorMiasto =
+          safeParse(row.adresy_odbioru_json)[0]?.miasto || row.zl_miasto || '-';
+        const dostawaKod =
+          safeParse(row.adresy_dostawy_json)[0]?.kod ||
+          row.zl_kod_pocztowy ||
+          '-';
+
+        return `
+        <tr>
+          <td>${row.zl_nazwa}</td>
+          <td>${formatDate(row.pickup_date_start)}</td>
+          <td>${odbiorMiasto}</td>
+          <td>${formatCustoms(row)}</td>
+          <td>${row.palety || '-'}</td>
+          <td>${row.wymiar || '-'}</td>
+          <td>${row.ldm || '-'}</td>
+          <td>${row.waga || '-'}</td>
+          <td>${dostawaKod}</td>
+          <td>${formatDate(row.delivery_date_start)}</td>
+          <td>${row.cena} ${getCurrencySymbol(row.waluta)}</td>
+        </tr>
+      `;
+      })
+      .join('');
+
+    // Tworzenie całego HTML
+    const doc = document.implementation.createHTMLDocument(
+      `Wykaz LTL - Tydzień ${weekNumber}`,
+    );
+
+    // Tworzenie style
+    const style = doc.createElement('style');
+    style.textContent = `
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12pt;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+  `;
+
+    const body = doc.body;
+    body.innerHTML = `
+    <h1>Wykaz LTL - Tydzień ${weekNumber}</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Zleceniodawca</th>
+          <th>Data załadunku</th>
+          <th>Adres załadunku</th>
+          <th>Cło</th>
+          <th>Ilość palet</th>
+          <th>Wymiar</th>
+          <th>LDM</th>
+          <th>Waga</th>
+          <th>Adres rozładunku</th>
+          <th>Data rozładunku</th>
+          <th>Cena</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHTML}
+      </tbody>
+    </table>
+  `;
+
+    doc.head.appendChild(style);
 
     const printWindow = window.open('', '', 'width=1024,height=768');
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+    if (printWindow) {
+      printWindow.document.documentElement.innerHTML =
+        doc.documentElement.innerHTML;
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
   };
 
   return (
@@ -296,13 +314,20 @@ export default function WykazExportLTL() {
                         '-'}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      {row.export_customs_option === 'adres'
-                        ? safeParse(row.export_customs_adres_json)?.miasto ||
-                          '-'
-                        : row.export_customs_option === 'odbior'
-                          ? 'Na zał'
-                          : '-'}
+                      {(() => {
+                        if (row.export_customs_option === 'adres') {
+                          return (
+                            safeParse(row.export_customs_adres_json)?.miasto ||
+                            '-'
+                          );
+                        }
+                        if (row.export_customs_option === 'odbior') {
+                          return 'Na zał';
+                        }
+                        return '-';
+                      })()}
                     </td>
+
                     <td className="px-4 py-2 text-center">
                       {row.palety || '-'}
                     </td>

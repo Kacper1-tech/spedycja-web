@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { getCurrencySymbol } from '../../utils/currency';
+import { useZaktualizowaniKontrahenci } from '../../hooks/useZaktualizowaniKontrahenci';
 
 export default function ListaZlecenExport() {
   const navigate = useNavigate();
@@ -12,22 +13,11 @@ export default function ListaZlecenExport() {
   const [showModal, setShowModal] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const [allSelected, setAllSelected] = useState(false);
+  const { zlecenia } = useZaktualizowaniKontrahenci();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data, error } = await supabase
-        .from('zlecenia_export')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('Błąd ładowania danych:', error);
-      } else {
-        setRows(data);
-        setFilteredRows(data);
-      }
-    };
-    fetchData();
-  }, []);
+    setFilteredRows(zlecenia);
+  }, [zlecenia]);
 
   const handleSelectRow = (id) => {
     setSelectedRows((prev) =>

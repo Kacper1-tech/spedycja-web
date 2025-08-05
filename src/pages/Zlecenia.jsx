@@ -1,13 +1,13 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Zlecenia() {
   const tiles = [
-    { label: "Lista zleceń eksportowych", to: "/zlecenia/export/lista" },
-    { label: "Lista zleceń importowych", to: "/zlecenia/import/lista" },
-		{ label: "Dodaj zlecenie eksportowe", to: "/zlecenia/export/dodaj" },
-		{ label: "Dodaj zlecenie importowe", to: "/zlecenia/import/dodaj" },
-    { label: "Wszystkie zlecenia", to: "/zlecenia/wszystkie" },
+    { label: 'Lista zleceń eksportowych', to: '/zlecenia/export/lista' },
+    { label: 'Lista zleceń importowych', to: '/zlecenia/import/lista' },
+    { label: 'Dodaj zlecenie eksportowe', to: '/zlecenia/export/dodaj' },
+    { label: 'Dodaj zlecenie importowe', to: '/zlecenia/import/dodaj' },
+    { label: 'Wszystkie zlecenia', to: '/zlecenia/wszystkie' },
   ];
 
   return (

@@ -1,15 +1,15 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Home() {
   const tiles = [
-    { label: "Zlecenia", to: "/zlecenia" },
-    { label: "Transport", to: "/transport" },
-    { label: "Plan", to: "/plan" },
-    { label: "Kontrahenci", to: "/kontrahenci" },
-    { label: "Księgowość", to: "/ksiegowosc" },
-    { label: "Rejestr", to: "/rejestr" },
-    { label: "Dokumenty", to: "/dokumenty" },
+    { label: 'Zlecenia', to: '/zlecenia' },
+    { label: 'Transport', to: '/transport' },
+    { label: 'Plan', to: '/plan' },
+    { label: 'Kontrahenci', to: '/kontrahenci' },
+    { label: 'Księgowość', to: '/ksiegowosc' },
+    { label: 'Rejestr', to: '/rejestr' },
+    { label: 'Dokumenty', to: '/dokumenty' },
   ];
 
   return (

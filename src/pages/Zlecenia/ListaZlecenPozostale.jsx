@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { getCurrencySymbol } from '../../utils/currency';
+import { useZaktualizowaniKontrahenciPozostale } from '../../hooks/useZaktualizowaniKontrahenciPozostale';
 
 export default function ListaZlecenPozostale() {
   const navigate = useNavigate();
@@ -12,22 +13,12 @@ export default function ListaZlecenPozostale() {
   const [showModal, setShowModal] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const [allSelected, setAllSelected] = useState(false);
+  const { zlecenia } = useZaktualizowaniKontrahenciPozostale();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data, error } = await supabase
-        .from('zlecenia_pozostale')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('Błąd ładowania danych:', error);
-      } else {
-        setRows(data);
-        setFilteredRows(data);
-      }
-    };
-    fetchData();
-  }, []);
+    setRows(zlecenia);
+    setFilteredRows(zlecenia);
+  }, [zlecenia]);
 
   const handleSelectRow = (id) => {
     setSelectedRows((prev) =>
