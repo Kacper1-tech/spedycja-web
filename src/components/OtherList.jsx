@@ -29,7 +29,9 @@ function OtherList({ data, onRemoveOther, onAddOther, onFieldChange }) {
         <h3 className="font-semibold text-gray-700">Inne:</h3>
         <div className="flex gap-2">
           <button
-            className={'disabled:text-gray-300 disabled:pointer-events-none'}
+            className={
+              'no-print disabled:text-gray-300 disabled:pointer-events-none'
+            }
             disabled={!!newOther}
             onClick={handleAddNew}
           >

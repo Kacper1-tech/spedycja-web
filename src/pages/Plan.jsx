@@ -22,6 +22,41 @@ const Plan = () => {
     }, {});
   }, [otherList]);
 
+  // --- multi-print state & helpers ---
+  const [selectedDates, setSelectedDates] = useState(new Set());
+
+  const toggleDate = (date) => {
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedDates(new Set());
+
+  // Klon z przeniesieniem wartości input/textarea/select
+  const cloneWithFormValues = (sourceEl) => {
+    const clone = sourceEl.cloneNode(true);
+    const srcInputs = sourceEl.querySelectorAll('input, textarea, select');
+    const dstInputs = clone.querySelectorAll('input, textarea, select');
+    dstInputs.forEach((el, idx) => {
+      const src = srcInputs[idx];
+      if (!src) return;
+      if (el.tagName === 'SELECT') {
+        Array.from(el.options).forEach((opt) => {
+          opt.selected = opt.value === src.value;
+        });
+      } else if (el.tagName === 'TEXTAREA') {
+        el.textContent = src.value ?? '';
+      } else {
+        el.setAttribute('value', src.value ?? '');
+      }
+    });
+    return clone;
+  };
+
   const groupedUnloadList = useMemo(() => {
     if (!unloadList) return null;
     return unloadList.reduce((acc, item) => {
@@ -51,51 +86,138 @@ const Plan = () => {
   const otherDates = Object.keys(groupedOtherList ?? {});
   const allDates = [
     ...new Set([...loadDates, ...unloadDates, ...otherDates]),
-  ].sort((a, b) => new Date(a) - new Date(b));
+  ].sort((a, b) => new Date(b) - new Date(a));
 
   const handlePrint = (date) => {
-    const content = document.getElementById(`date-${date}`);
-    if (!content) return;
+    const sourceEl = document.getElementById(`date-${date}`);
+    if (!sourceEl) return;
 
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) return;
+    // Klonujemy sekcję do wydruku i przenosimy wartości pól formularza
+    const clone = sourceEl.cloneNode(true);
+    const srcInputs = sourceEl.querySelectorAll('input, textarea, select');
+    const dstInputs = clone.querySelectorAll('input, textarea, select');
 
-    // Poczekaj aż nowe okno w pełni się otworzy (ma <head> i <body>)
-    printWindow.addEventListener(
-      'load',
-      () => {
-        const doc = printWindow.document;
+    dstInputs.forEach((el, idx) => {
+      const src = srcInputs[idx];
+      if (!src) return;
+      if (el.tagName === 'SELECT') {
+        Array.from(el.options).forEach((opt) => {
+          opt.selected = opt.value === src.value;
+        });
+      } else if (el.tagName === 'TEXTAREA') {
+        el.textContent = src.value ?? '';
+      } else {
+        el.setAttribute('value', src.value ?? '');
+      }
+    });
 
-        // Wyczyść startową zawartość
-        if (doc.head) doc.head.innerHTML = '';
-        if (doc.body) doc.body.innerHTML = '';
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Plan rozładunków – ${date}</title>
+  <style>
+    @media print { .no-print { display: none; } }
+    html, body { margin: 0; padding: 16px; font-family: Arial, sans-serif; font-size: 12px; }
+    h2, h3 { margin: 12px 0 8px; color: #000; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: top; }
+    input, textarea, select { border: none; outline: none; }
+  </style>
+</head>
+<body>
+  ${clone.innerHTML}
+  <script>
+    window.onafterprint = () => window.close();
+  <\/script>
+</body>
+</html>`.trim();
 
-        // <title>
-        const titleEl = doc.createElement('title');
-        titleEl.textContent = `Plan rozładunków – ${date}`;
-        doc.head.appendChild(titleEl);
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) return; // jeśli zablokowano pop-upy
 
-        // <style>
-        const styleEl = doc.createElement('style');
-        styleEl.textContent = `
-      body { font-family: Arial, sans-serif; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-      th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-      h3 { color: #000; margin-top: 24px; }
-    `;
-        doc.head.appendChild(styleEl);
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
 
-        // Treść do wydruku (klonujemy HTML z bieżącej strony)
-        const wrapper = doc.createElement('div');
-        wrapper.innerHTML = content.innerHTML;
-        doc.body.appendChild(wrapper);
+    // Po zrenderowaniu treści inicjuj druk
+    w.onload = () => {
+      try {
+        w.focus();
+        w.print();
+      } catch (_) {}
+    };
 
-        // Drukuj
-        printWindow.focus();
-        printWindow.print();
-      },
-      { once: true },
-    );
+    // Fallback dla przeglądarek, które nie wywołują onload po document.write
+    setTimeout(() => {
+      try {
+        w.focus();
+        w.print();
+      } catch (_) {}
+    }, 300);
+  };
+
+  const handlePrintSelected = () => {
+    if (selectedDates.size === 0) return;
+
+    const sections = [];
+    [...selectedDates]
+      .sort((a, b) => new Date(b) - new Date(a)) // np. od najnowszej
+      .forEach((date) => {
+        const container = document.getElementById(`date-${date}`);
+        if (!container) return;
+        const cloned = cloneWithFormValues(container);
+        // Usuń elementy, których nie chcesz na wydruku
+        cloned
+          .querySelectorAll('.no-print,[data-print="hide"]')
+          .forEach((el) => el.remove());
+
+        sections.push(`<h2 style="margin:16px 0 8px;">${date}</h2>`);
+        sections.push(cloned.innerHTML);
+        sections.push(
+          '<hr style="margin:24px 0;border:none;border-top:1px solid #000;" />',
+        );
+      });
+
+    const html = `
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Plan – druk zbiorczy</title>
+<style>
+  @media print { .no-print { display: none; } }
+  html, body { margin: 0; padding: 16px; font-family: Arial, sans-serif; font-size: 12px; }
+  h2, h3 { color: #000; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: top; }
+  input, textarea, select { border: none; outline: none; }
+</style>
+</head>
+<body>
+  ${sections.join('\n')}
+  <script>window.onafterprint = () => window.close();<\/script>
+</body>
+</html>`.trim();
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => {
+      try {
+        w.focus();
+        w.print();
+      } catch (_) {}
+    };
+    setTimeout(() => {
+      try {
+        w.focus();
+        w.print();
+      } catch (_) {}
+    }, 300);
   };
 
   const parseMiasto = (json) => {
@@ -348,12 +470,38 @@ const Plan = () => {
 
   return (
     <div className="p-4 space-y-8">
+      <div className="no-print flex items-center justify-end gap-2 mb-4">
+        <button
+          onClick={handlePrintSelected}
+          disabled={selectedDates.size === 0}
+          className="px-3 py-1 text-sm rounded bg-green-600 text-white disabled:bg-gray-300"
+        >
+          🖨️ Drukuj zaznaczone ({selectedDates.size})
+        </button>
+        {selectedDates.size > 0 && (
+          <button
+            onClick={clearSelection}
+            className="px-3 py-1 text-sm rounded bg-gray-200"
+          >
+            Wyczyść zaznaczenie
+          </button>
+        )}
+      </div>
       {allDates.map((date) => (
         <div key={date} className="border rounded-xl p-4 shadow bg-white">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold capitalize text-blue-700">
-              {date}
-            </h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                className="no-print w-4 h-4"
+                checked={selectedDates.has(date)}
+                onChange={() => toggleDate(date)}
+                aria-label={`Zaznacz datę ${date} do druku`}
+              />
+              <h2 className="text-lg font-bold capitalize text-blue-700">
+                {date}
+              </h2>
+            </div>
             <button
               onClick={() => handlePrint(date)}
               className="no-print px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
