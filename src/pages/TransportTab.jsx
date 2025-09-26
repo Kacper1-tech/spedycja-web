@@ -661,7 +661,9 @@ export default function TransportTab() {
 
                           return (
                             adresy
-                              .map((a) => a.kod?.trim())
+                              .map((a) =>
+                                `${a.kod?.trim() || ''} ${a.miasto?.trim() || ''}`.trim(),
+                              )
                               .filter(Boolean)
                               .join('+') ||
                             o.zl_kod_rozladunku?.trim() ||
@@ -1180,16 +1182,16 @@ export default function TransportTab() {
                   </td>
                   <td className="border p-2 text-center align-middle whitespace-nowrap">
                     {(() => {
-                      const adresy = safeParse(o.adresy_dostawy_json);
-                      if (!Array.isArray(adresy))
-                        return o.zl_kod_rozladunku?.trim() || '-';
-
-                      const kody = adresy
-                        .map((a) => a.kod?.trim())
-                        .filter(Boolean)
-                        .join('+');
-
-                      return kody || o.zl_kod_rozladunku?.trim() || '-';
+                      const dostawy = safeParse(o.adresy_dostawy_json);
+                      if (dostawy.length > 0) {
+                        return dostawy
+                          .map((d) => `${d.kod || ''} ${d.miasto || ''}`.trim())
+                          .join(', ');
+                      }
+                      return (
+                        `${o.zl_kod_pocztowy || ''} ${o.zl_miasto || ''}`.trim() ||
+                        '-'
+                      );
                     })()}
                   </td>
                   <td className="border p-2 text-center">
@@ -1241,16 +1243,16 @@ export default function TransportTab() {
                   </td>
                   <td className="border p-2 text-center align-middle whitespace-nowrap">
                     {(() => {
-                      const adresy = safeParse(o.adresy_dostawy_json);
-                      if (!Array.isArray(adresy))
-                        return o.zl_kod_rozladunku?.trim() || '-';
-
-                      const kody = adresy
-                        .map((a) => a.kod?.trim())
-                        .filter(Boolean)
-                        .join('+');
-
-                      return kody || o.zl_kod_rozladunku?.trim() || '-';
+                      const dostawy = safeParse(o.adresy_dostawy_json);
+                      if (dostawy.length > 0) {
+                        return dostawy
+                          .map((d) => `${d.kod || ''} ${d.miasto || ''}`.trim())
+                          .join(', ');
+                      }
+                      return (
+                        `${o.zl_kod_pocztowy || ''} ${o.zl_miasto || ''}`.trim() ||
+                        '-'
+                      );
                     })()}
                   </td>
                   <td className="border p-2 text-center">

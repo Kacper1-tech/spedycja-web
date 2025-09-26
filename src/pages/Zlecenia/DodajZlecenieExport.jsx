@@ -78,7 +78,7 @@ export default function DodajZlecenieExport() {
 
       setOriginalZlecenie(data);
 
-      // Ustaw wszystkie stany formularza na podstawie danych z Supabase
+      // --- proste pola tekstowe ---
       setNumerZlecenia(data.numer_zlecenia || '');
       setOsobaKontaktowa(data.osoba_kontaktowa || '');
       setTelefonKontaktowy(data.telefon_kontaktowy || '');
@@ -95,43 +95,74 @@ export default function DodajZlecenieExport() {
       setZlEori(data.zl_eori || '');
       setZlPesel(data.zl_pesel || '');
 
-      setPickupDate(data.pickup_date_start || '');
-      setPickupRange([data.pickup_date_start, data.pickup_date_end]);
+      // --- DATY: zawsze Date lub null ---
+      const toDate = (v) => (v ? new Date(v) : null);
+
+      setPickupDate(toDate(data.pickup_date_start));
+      setPickupRange([
+        toDate(data.pickup_date_start),
+        toDate(data.pickup_date_end),
+      ]);
       setShowPickupRange(
-        !!data.pickup_date_end &&
+        Boolean(data.pickup_date_end) &&
           data.pickup_date_start !== data.pickup_date_end,
       );
 
-      setDeliveryDate(data.delivery_date_start || '');
-      setDeliveryRange([data.delivery_date_start, data.delivery_date_end]);
+      setDeliveryDate(toDate(data.delivery_date_start));
+      setDeliveryRange([
+        toDate(data.delivery_date_start),
+        toDate(data.delivery_date_end),
+      ]);
       setShowDeliveryRange(
-        !!data.delivery_date_end &&
+        Boolean(data.delivery_date_end) &&
           data.delivery_date_start !== data.delivery_date_end,
       );
 
+      // --- GODZINY (zostaw jako stringi, jeśli tak masz w inputach) ---
       setPickupTime(data.pickup_time || '');
-      setPickupTimeRange([data.pickup_time_start, data.pickup_time_end]);
+      setPickupTimeRange([
+        data.pickup_time_start || '',
+        data.pickup_time_end || '',
+      ]);
       setDeliveryTime(data.delivery_time || '');
-      setDeliveryTimeRange([data.delivery_time_start, data.delivery_time_end]);
+      setDeliveryTimeRange([
+        data.delivery_time_start || '',
+        data.delivery_time_end || '',
+      ]);
+
+      // --- JSON: zawsze try/catch + poprawny domyślny typ ---
+      const safeParse = (str, fallback) => {
+        try {
+          return JSON.parse(str ?? '');
+        } catch {
+          return fallback;
+        }
+      };
 
       setExportCustomsOption(data.export_customs_option || '');
       setExportCustomsAddress(
-        JSON.parse(data.export_customs_adres_json || '[]'),
+        // to OBIEKT, nie tablica:
+        safeParse(data.export_customs_adres_json, {}),
       );
 
       setImportCustomsOption(data.import_customs_option || '');
       setImportCustomsAddress(
-        JSON.parse(data.import_customs_adres_json || '[]'),
+        // to OBIEKT, nie tablica:
+        safeParse(data.import_customs_adres_json, {}),
       );
 
-      setCurrency(data.waluta || '');
+      // adresy odbioru/dostawy to LISTY:
+      setPickupAddresses(safeParse(data.adresy_odbioru_json, []));
+      setDeliveryAddresses(safeParse(data.adresy_dostawy_json, []));
+
+      // --- waluta: solidna wartość domyślna ---
+      setCurrency(data.waluta || 'EUR');
       setCustomCurrency(data.custom_currency || '');
 
-      setPickupAddresses(JSON.parse(data.adresy_odbioru_json || '[]'));
-      setDeliveryAddresses(JSON.parse(data.adresy_dostawy_json || '[]'));
-
+      // --- kontrahent ---
       setKontrahentId(data.kontrahent_id || null);
 
+      // --- reszta ---
       setPalety(data.palety || '');
       setWaga(data.waga || '');
       setWymiar(data.wymiar || '');
@@ -689,23 +720,46 @@ export default function DodajZlecenieExport() {
   };
 
   const handleKontrahentSelect = (kontrahent) => {
+    // nazwa i zamknięcie podpowiedzi
     setZlNazwa(kontrahent.nazwa);
     setKontrahenciSugestie([]);
 
-    setZlUlica(kontrahent.adres_json?.ulica_nr || '');
+    // (opcjonalnie) pamiętaj id kontrahenta do zapisu w payloadzie
+    if (typeof setKontrahentId === 'function' && kontrahent.id) {
+      setKontrahentId(kontrahent.id);
+    }
+
+    // adres zleceniodawcy
+    setZlUlica(
+      kontrahent.adres_json?.ulica_nr || kontrahent.adres_json?.ulica || '',
+    );
     setZlMiasto(kontrahent.adres_json?.miasto || '');
-    setZlKodPocztowy(kontrahent.adres_json?.kod_pocztowy || '');
+    setZlKodPocztowy(
+      kontrahent.adres_json?.kod_pocztowy || kontrahent.adres_json?.kod || '',
+    );
     setZlPanstwo(kontrahent.adres_json?.panstwo || '');
 
+    // identyfikatory
     setVat(kontrahent.identyfikatory_json?.vat || '');
     setZlNip(kontrahent.identyfikatory_json?.nip || '');
     setZlRegon(kontrahent.identyfikatory_json?.regon || '');
     setZlEori(kontrahent.identyfikatory_json?.eori || '');
     setZlPesel(kontrahent.identyfikatory_json?.pesel || '');
 
-    setOsobaKontaktowa(kontrahent.kontakt_json?.imie_nazwisko || '');
-    setTelefonKontaktowy(kontrahent.kontakt_json?.telefon || '');
-    setEmailKontaktowy(kontrahent.kontakt_json?.email || '');
+    // ------- KONTAKT: uzupełnij TYLKO gdy pole jest puste --------
+    // preferuj kontakty_json (tablica), wstecznie obsłuż kontakt_json (obiekt)
+    const firstContact =
+      (Array.isArray(kontrahent.kontakty_json) &&
+        kontrahent.kontakty_json[0]) ||
+      kontrahent.kontakt_json || // fallback: stare pole
+      null;
+
+    if (firstContact) {
+      setOsobaKontaktowa((prev) => prev || firstContact.imie_nazwisko || '');
+      setTelefonKontaktowy((prev) => prev || firstContact.telefon || '');
+      setEmailKontaktowy((prev) => prev || firstContact.email || '');
+    }
+    // --------------------------------------------------------------
   };
 
   return (

@@ -57,92 +57,98 @@ export default function DodajZlecenieImport() {
   const [deliverySuggestions, setDeliverySuggestions] = useState([]);
 
   useEffect(() => {
-    if (id) {
-      const fetchZlecenie = async () => {
-        const { data, error } = await supabase
-          .from('zlecenia_import')
-          .select('*')
-          .eq('id', id)
-          .single();
+    if (!id) return;
 
-        if (error) {
-          console.error('Błąd pobierania:', error);
-        } else {
-          setNumerZlecenia(data.numer_zlecenia || '');
-          setOsobaKontaktowa(data.osoba_kontaktowa || '');
-          setTelefonKontaktowy(data.telefon_kontaktowy || '');
-          setEmailKontaktowy(data.email_kontaktowy || '');
-          setZlNazwa(data.zl_nazwa || '');
-          setZlUlica(data.zl_ulica || '');
-          setZlMiasto(data.zl_miasto || '');
-          setZlKodPocztowy(data.zl_kod_pocztowy || '');
-          setZlPanstwo(data.zl_panstwo || '');
-          setVat(data.zl_vat || '');
-          setZlNip(data.zl_nip || '');
-          setZlRegon(data.zl_regon || '');
-          setZlEori(data.zl_eori || '');
-          setZlPesel(data.zl_pesel || '');
+    const fetchZlecenie = async () => {
+      const { data, error } = await supabase
+        .from('zlecenia_import')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-          setPickupDate(
-            data.pickup_date_start
-              ? new Date(data.pickup_date_start)
-              : new Date(),
-          );
-          setPickupRange([
-            data.pickup_date_start ? new Date(data.pickup_date_start) : null,
-            data.pickup_date_end ? new Date(data.pickup_date_end) : null,
-          ]);
-          setShowPickupRange(!!data.pickup_date_end);
+      if (error) {
+        console.error('Błąd pobierania:', error);
+        alert('Nie udało się załadować zlecenia.');
+        return;
+      }
 
-          setDeliveryDate(
-            data.delivery_date_start
-              ? new Date(data.delivery_date_start)
-              : new Date(),
-          );
-          setDeliveryRange([
-            data.delivery_date_start
-              ? new Date(data.delivery_date_start)
-              : null,
-            data.delivery_date_end ? new Date(data.delivery_date_end) : null,
-          ]);
-          setShowDeliveryRange(!!data.delivery_date_end);
+      setNumerZlecenia(data.numer_zlecenia || '');
+      setOsobaKontaktowa(data.osoba_kontaktowa || '');
+      setTelefonKontaktowy(data.telefon_kontaktowy || '');
+      setEmailKontaktowy(data.email_kontaktowy || '');
 
-          setPickupTime(data.pickup_time || '');
-          setPickupTimeRange([
-            data.pickup_time_start || '',
-            data.pickup_time_end || '',
-          ]);
-          setDeliveryTime(data.delivery_time || '');
-          setDeliveryTimeRange([
-            data.delivery_time_start || '',
-            data.delivery_time_end || '',
-          ]);
+      setZlNazwa(data.zl_nazwa || '');
+      setZlUlica(data.zl_ulica || '');
+      setZlMiasto(data.zl_miasto || '');
+      setZlKodPocztowy(data.zl_kod_pocztowy || '');
+      setZlPanstwo(data.zl_panstwo || '');
+      setVat(data.zl_vat || '');
+      setZlNip(data.zl_nip || '');
+      setZlRegon(data.zl_regon || '');
+      setZlEori(data.zl_eori || '');
+      setZlPesel(data.zl_pesel || '');
 
-          setPickupAddresses(JSON.parse(data.adresy_odbioru_json || '[{}]'));
-          setDeliveryAddresses(JSON.parse(data.adresy_dostawy_json || '[{}]'));
+      // helper do dat
+      const toDate = (v) => (v ? new Date(v) : null);
 
-          setExportCustomsOption(data.export_customs_option || '');
-          setExportCustomsAddress(
-            JSON.parse(data.export_customs_adres_json || '{}'),
-          );
+      setPickupDate(toDate(data.pickup_date_start));
+      setPickupRange([
+        toDate(data.pickup_date_start),
+        toDate(data.pickup_date_end),
+      ]);
+      setShowPickupRange(
+        Boolean(data.pickup_date_end) &&
+          data.pickup_date_start !== data.pickup_date_end,
+      );
 
-          setImportCustomsOption(data.import_customs_option || '');
-          setImportCustomsAddress(
-            JSON.parse(data.import_customs_adres_json || '{}'),
-          );
+      setDeliveryDate(toDate(data.delivery_date_start));
+      setDeliveryRange([
+        toDate(data.delivery_date_start),
+        toDate(data.delivery_date_end),
+      ]);
+      setShowDeliveryRange(
+        Boolean(data.delivery_date_end) &&
+          data.delivery_date_start !== data.delivery_date_end,
+      );
 
-          setPalety(data.palety || '');
-          setWaga(data.waga || '');
-          setWymiar(data.wymiar || '');
-          setLdm(data.ldm || '');
-          setCena(data.cena || '');
-          setCurrency(data.waluta || 'EUR');
-          setCustomCurrency(data.custom_currency || '');
-          setUwagi(data.uwagi || '');
+      setPickupTime(data.pickup_time || '');
+      setPickupTimeRange([
+        data.pickup_time_start || '',
+        data.pickup_time_end || '',
+      ]);
+      setDeliveryTime(data.delivery_time || '');
+      setDeliveryTimeRange([
+        data.delivery_time_start || '',
+        data.delivery_time_end || '',
+      ]);
+
+      // bezpieczne parsowanie JSON
+      const safeParse = (str, fallback) => {
+        try {
+          return JSON.parse(str ?? '');
+        } catch {
+          return fallback;
         }
       };
-      fetchZlecenie();
-    }
+
+      setPickupAddresses(safeParse(data.adresy_odbioru_json, []));
+      setDeliveryAddresses(safeParse(data.adresy_dostawy_json, []));
+      setExportCustomsOption(data.export_customs_option || '');
+      setExportCustomsAddress(safeParse(data.export_customs_adres_json, {}));
+      setImportCustomsOption(data.import_customs_option || '');
+      setImportCustomsAddress(safeParse(data.import_customs_adres_json, {}));
+
+      setPalety(data.palety || '');
+      setWaga(data.waga || '');
+      setWymiar(data.wymiar || '');
+      setLdm(data.ldm || '');
+      setCena(data.cena || '');
+      setCurrency(data.waluta || 'EUR');
+      setCustomCurrency(data.custom_currency || '');
+      setUwagi(data.uwagi || '');
+    };
+
+    fetchZlecenie();
   }, [id]);
 
   const formatDate = (date) => {
@@ -472,10 +478,10 @@ export default function DodajZlecenieImport() {
   const handleExportCustomsSelect = (agency) => {
     setExportCustomsAddress({
       nazwa: agency.nazwa,
-      ulica: agency.ulica_nr,
-      miasto: agency.miasto,
-      kod: agency.kod_pocztowy,
-      panstwo: agency.panstwo,
+      ulica: agency.ulica ?? agency.ulica_nr ?? '',
+      miasto: agency.miasto ?? '',
+      kod: agency.kod ?? agency.kod_pocztowy ?? '',
+      panstwo: agency.panstwo ?? '',
     });
     setExportCustomsSuggestions([]);
   };
@@ -639,23 +645,39 @@ export default function DodajZlecenieImport() {
   };
 
   const handleKontrahentSelect = (kontrahent) => {
+    // nazwa i zamknięcie podpowiedzi
     setZlNazwa(kontrahent.nazwa);
     setKontrahenciSugestie([]);
 
-    setZlUlica(kontrahent.adres_json?.ulica_nr || '');
+    // Adres (obsłuż ulica_nr/kod_pocztowy oraz alternatywne nazwy)
+    setZlUlica(
+      kontrahent.adres_json?.ulica ?? kontrahent.adres_json?.ulica_nr ?? '',
+    );
     setZlMiasto(kontrahent.adres_json?.miasto || '');
-    setZlKodPocztowy(kontrahent.adres_json?.kod_pocztowy || '');
+    setZlKodPocztowy(
+      kontrahent.adres_json?.kod ?? kontrahent.adres_json?.kod_pocztowy ?? '',
+    );
     setZlPanstwo(kontrahent.adres_json?.panstwo || '');
 
+    // Identyfikatory
     setVat(kontrahent.identyfikatory_json?.vat || '');
     setZlNip(kontrahent.identyfikatory_json?.nip || '');
     setZlRegon(kontrahent.identyfikatory_json?.regon || '');
     setZlEori(kontrahent.identyfikatory_json?.eori || '');
     setZlPesel(kontrahent.identyfikatory_json?.pesel || '');
 
-    setOsobaKontaktowa(kontrahent.kontakt_json?.imie_nazwisko || '');
-    setTelefonKontaktowy(kontrahent.kontakt_json?.telefon || '');
-    setEmailKontaktowy(kontrahent.kontakt_json?.email || '');
+    // Kontakt: preferuj kontakty_json[0], fallback na kontakt_json; uzupełniaj tylko puste pola
+    const firstContact =
+      (Array.isArray(kontrahent.kontakty_json) &&
+        kontrahent.kontakty_json[0]) ||
+      kontrahent.kontakt_json ||
+      null;
+
+    if (firstContact) {
+      setOsobaKontaktowa((prev) => prev || firstContact.imie_nazwisko || '');
+      setTelefonKontaktowy((prev) => prev || firstContact.telefon || '');
+      setEmailKontaktowy((prev) => prev || firstContact.email || '');
+    }
   };
 
   return (

@@ -14,8 +14,8 @@ export default function DodajZleceniePozostale() {
   const [pickupRange, setPickupRange] = useState([null, null]);
   const [showDeliveryRange, setShowDeliveryRange] = useState(false);
   const [deliveryRange, setDeliveryRange] = useState([null, null]);
-  const [pickupDate, setPickupDate] = useState(new Date());
-  const [deliveryDate, setDeliveryDate] = useState(new Date());
+  const [pickupDate, setPickupDate] = useState(null);
+  const [deliveryDate, setDeliveryDate] = useState(null);
   const [exportCustomsOption, setExportCustomsOption] = useState(''); // "odbior" lub "adres"
   const [importCustomsOption, setImportCustomsOption] = useState(''); // "odbior" lub "adres"
   const [currency, setCurrency] = useState('EUR');
@@ -487,10 +487,10 @@ export default function DodajZleceniePozostale() {
   const handleExportCustomsSelect = (agency) => {
     setExportCustomsAddress({
       company: agency.nazwa,
-      street: agency.ulica_nr,
-      city: agency.miasto,
-      zip: agency.kod_pocztowy,
-      country: agency.panstwo,
+      street: agency.ulica ?? agency.ulica_nr ?? '',
+      city: agency.miasto ?? '',
+      zip: agency.kod ?? agency.kod_pocztowy ?? '',
+      country: agency.panstwo ?? '',
     });
     setExportCustomsSuggestions([]);
   };
@@ -515,10 +515,10 @@ export default function DodajZleceniePozostale() {
   const handleImportCustomsSelect = (agency) => {
     setImportCustomsAddress({
       company: agency.nazwa,
-      street: agency.ulica_nr,
-      city: agency.miasto,
-      zip: agency.kod_pocztowy,
-      country: agency.panstwo,
+      street: agency.ulica ?? agency.ulica_nr ?? '',
+      city: agency.miasto ?? '',
+      zip: agency.kod ?? agency.kod_pocztowy ?? '',
+      country: agency.panstwo ?? '',
     });
     setImportCustomsSuggestions([]);
   };
@@ -544,20 +544,35 @@ export default function DodajZleceniePozostale() {
     setZlNazwa(kontrahent.nazwa);
     setKontrahenciSugestie([]);
 
-    setZlUlica(kontrahent.adres_json?.ulica_nr || '');
+    // Adres – obsłuż obie nazwy pól
+    setZlUlica(
+      kontrahent.adres_json?.ulica ?? kontrahent.adres_json?.ulica_nr ?? '',
+    );
     setZlMiasto(kontrahent.adres_json?.miasto || '');
-    setZlKodPocztowy(kontrahent.adres_json?.kod_pocztowy || '');
+    setZlKodPocztowy(
+      kontrahent.adres_json?.kod ?? kontrahent.adres_json?.kod_pocztowy ?? '',
+    );
     setZlPanstwo(kontrahent.adres_json?.panstwo || '');
 
+    // Identyfikatory
     setVat(kontrahent.identyfikatory_json?.vat || '');
     setZlNip(kontrahent.identyfikatory_json?.nip || '');
     setZlRegon(kontrahent.identyfikatory_json?.regon || '');
     setZlEori(kontrahent.identyfikatory_json?.eori || '');
     setZlPesel(kontrahent.identyfikatory_json?.pesel || '');
 
-    setOsobaKontaktowa(kontrahent.kontakt_json?.imie_nazwisko || '');
-    setTelefonKontaktowy(kontrahent.kontakt_json?.telefon || '');
-    setEmailKontaktowy(kontrahent.kontakt_json?.email || '');
+    // Kontakt: preferuj kontakty_json[0], fallback na kontakt_json; uzupełniaj TYLKO puste
+    const firstContact =
+      (Array.isArray(kontrahent.kontakty_json) &&
+        kontrahent.kontakty_json[0]) ||
+      kontrahent.kontakt_json ||
+      null;
+
+    if (firstContact) {
+      setOsobaKontaktowa((prev) => prev || firstContact.imie_nazwisko || '');
+      setTelefonKontaktowy((prev) => prev || firstContact.telefon || '');
+      setEmailKontaktowy((prev) => prev || firstContact.email || '');
+    }
   };
 
   const handlePickupAddressNameChange = async (e, index) => {
