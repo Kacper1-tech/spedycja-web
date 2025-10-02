@@ -50,11 +50,28 @@ export default function DodajZlecenieImport() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [kontrahenciSugestie, setKontrahenciSugestie] = useState([]);
+  const [kontrahentId, setKontrahentId] = useState(null);
   const [exportCustomsSuggestions, setExportCustomsSuggestions] = useState([]);
   const [showPickupTimeRange, setShowPickupTimeRange] = useState(false);
   const [showDeliveryTimeRange, setShowDeliveryTimeRange] = useState(false);
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [deliverySuggestions, setDeliverySuggestions] = useState([]);
+  const norm = (v) => (v ?? '').toString().trim().toLowerCase();
+
+  const safeParse = (val, fallback) => {
+    if (val == null) return fallback;
+    if (typeof val === 'object') return val; // już JSON
+    try {
+      return JSON.parse(val);
+    } catch {
+      return fallback;
+    }
+  };
+
+  const sameContact = (a, b) =>
+    norm(a?.imie_nazwisko) === norm(b?.imie_nazwisko) &&
+    norm(a?.email) === norm(b?.email) &&
+    norm(a?.telefon) === norm(b?.telefon);
 
   useEffect(() => {
     if (!id) return;
@@ -122,15 +139,6 @@ export default function DodajZlecenieImport() {
         data.delivery_time_end || '',
       ]);
 
-      // bezpieczne parsowanie JSON
-      const safeParse = (str, fallback) => {
-        try {
-          return JSON.parse(str ?? '');
-        } catch {
-          return fallback;
-        }
-      };
-
       setPickupAddresses(safeParse(data.adresy_odbioru_json, []));
       setDeliveryAddresses(safeParse(data.adresy_dostawy_json, []));
       setExportCustomsOption(data.export_customs_option || '');
@@ -146,6 +154,7 @@ export default function DodajZlecenieImport() {
       setCurrency(data.waluta || 'EUR');
       setCustomCurrency(data.custom_currency || '');
       setUwagi(data.uwagi || '');
+      setKontrahentId(data.kontrahent_id || null);
     };
 
     fetchZlecenie();
@@ -163,6 +172,12 @@ export default function DodajZlecenieImport() {
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+
+    const newContact = {
+      imie_nazwisko: osobaKontaktowa || null,
+      email: emailKontaktowy || null,
+      telefon: telefonKontaktowy || null,
+    };
 
     let kontrahentIdNowy;
 
@@ -198,13 +213,10 @@ export default function DodajZlecenieImport() {
           eori: zlEori || null,
           pesel: zlPesel || null,
         },
-        kontakty_json: [
-          {
-            imie_nazwisko: osobaKontaktowa || null,
-            email: emailKontaktowy || null,
-            telefon: telefonKontaktowy || null,
-          },
-        ],
+        kontakty_json:
+          newContact.imie_nazwisko || newContact.email || newContact.telefon
+            ? [newContact]
+            : [],
       };
 
       const { data: insertedKontrahent, error: kontrahentError } =
@@ -222,24 +234,25 @@ export default function DodajZlecenieImport() {
     } else {
       kontrahentIdNowy = existingKontrahent.id;
 
-      const oldContacts = existingKontrahent.kontakty_json || [];
-      const newContact = {
-        imie_nazwisko: osobaKontaktowa || null,
-        email: emailKontaktowy || null,
-        telefon: telefonKontaktowy || null,
-      };
+      // stare kontakty bezpiecznie jako tablica
+      const oldContacts = Array.isArray(existingKontrahent.kontakty_json)
+        ? existingKontrahent.kontakty_json
+        : [];
 
-      // ✅ DEDUPLIKACJA — sprawdź, czy już istnieje
-      const isDuplicate = oldContacts.some(
-        (c) =>
-          c.imie_nazwisko === newContact.imie_nazwisko &&
-          c.email === newContact.email &&
-          c.telefon === newContact.telefon,
-      );
+      // czy w ogóle wprowadzono jakiś kontakt
+      const hasAnyNew =
+        (newContact.imie_nazwisko && newContact.imie_nazwisko.trim() !== '') ||
+        (newContact.email && newContact.email.trim() !== '') ||
+        (newContact.telefon && newContact.telefon.trim() !== '');
 
-      const updatedContacts = isDuplicate
-        ? oldContacts
-        : [...oldContacts, newContact];
+      const isDuplicate =
+        hasAnyNew && oldContacts.some((c) => sameContact(c, newContact));
+
+      const updatedContacts = hasAnyNew
+        ? isDuplicate
+          ? oldContacts
+          : [...oldContacts, newContact]
+        : oldContacts;
 
       const kontrahentPayload = {
         nazwa: zlNazwa,
@@ -337,18 +350,14 @@ export default function DodajZlecenieImport() {
         : formatDate(deliveryRange[1]),
       export_customs_option: exportCustomsOption,
       export_customs_adres_json:
-        exportCustomsOption === 'adres'
-          ? JSON.stringify(exportCustomsAddress)
-          : null,
+        exportCustomsOption === 'adres' ? exportCustomsAddress : null,
       import_customs_option: importCustomsOption,
       import_customs_adres_json:
-        importCustomsOption === 'adres'
-          ? JSON.stringify(importCustomsAddress)
-          : null,
+        importCustomsOption === 'adres' ? importCustomsAddress : null,
       waluta: currency,
       custom_currency: customCurrency || null,
-      adresy_odbioru_json: JSON.stringify(pickupAddresses),
-      adresy_dostawy_json: JSON.stringify(deliveryAddresses),
+      adresy_odbioru_json: pickupAddresses || [],
+      adresy_dostawy_json: deliveryAddresses || [],
       palety: palety || null,
       waga: waga || null,
       wymiar: wymiar || null,
@@ -361,7 +370,7 @@ export default function DodajZlecenieImport() {
       delivery_time: !showDeliveryTimeRange ? deliveryTime : null,
       delivery_time_start: showDeliveryTimeRange ? deliveryTimeRange[0] : null,
       delivery_time_end: showDeliveryTimeRange ? deliveryTimeRange[1] : null,
-      kontrahent_id: kontrahentIdNowy,
+      kontrahent_id: kontrahentIdNowy || kontrahentId,
     };
 
     // 3️⃣ INSERT lub UPDATE
@@ -384,6 +393,67 @@ export default function DodajZlecenieImport() {
       setIsSubmitting(false);
       return;
     }
+
+    // ---- KROK 4: upsert saved_addresses + saved_contacts ----
+    try {
+      const validAddr = (a) =>
+        a && (a.nazwa || a.ulica || a.miasto || a.kod || a.panstwo);
+
+      const normAddr = (a) => ({
+        name: (a.nazwa || '').trim(),
+        street: (a.ulica || '').trim(),
+        postal_code: (a.kod || '').trim(),
+        city: (a.miasto || '').trim(),
+        country: (a.panstwo || '').trim(),
+      });
+
+      const upserts = [];
+
+      // 4.1 ODBIORY -> saved_addresses
+      for (const addr of pickupAddresses || []) {
+        if (!validAddr(addr)) continue;
+        upserts.push(
+          supabase
+            .from('saved_addresses')
+            .upsert(normAddr(addr), { onConflict: 'name,street,postal_code' }),
+        );
+      }
+
+      // 4.2 DOSTAWY -> saved_addresses
+      for (const addr of deliveryAddresses || []) {
+        if (!validAddr(addr)) continue;
+        upserts.push(
+          supabase
+            .from('saved_addresses')
+            .upsert(normAddr(addr), { onConflict: 'name,street,postal_code' }),
+        );
+      }
+
+      // 4.3 Kontakt -> saved_contacts (jeśli wpisany)
+      const hasContact =
+        (osobaKontaktowa && osobaKontaktowa.trim() !== '') ||
+        (telefonKontaktowy && telefonKontaktowy.trim() !== '') ||
+        (emailKontaktowy && emailKontaktowy.trim() !== '');
+
+      if (hasContact) {
+        upserts.push(
+          supabase.from('saved_contacts').upsert(
+            {
+              name: (osobaKontaktowa || '').trim(),
+              phone: (telefonKontaktowy || '').trim(),
+              email: (emailKontaktowy || '').trim(),
+            },
+            { onConflict: 'name,phone' }, // zmień jeśli masz inny unikat
+          ),
+        );
+      }
+
+      // wykonaj równolegle
+      await Promise.all(upserts);
+    } catch (e) {
+      console.error('Błąd upsert słowników:', e);
+    }
+    // ---- /KROK 4 ----
 
     alert(id ? 'Zlecenie zaktualizowane.' : 'Zlecenie zapisane.');
     navigate('/zlecenia/import/lista');
@@ -644,40 +714,35 @@ export default function DodajZlecenieImport() {
     setContactSuggestions([]);
   };
 
-  const handleKontrahentSelect = (kontrahent) => {
-    // nazwa i zamknięcie podpowiedzi
-    setZlNazwa(kontrahent.nazwa);
+  const handleKontrahentSelect = (k) => {
+    // zapamiętaj ID i nazwę + schowaj sugestie
+    setKontrahentId(k?.id ?? null);
+    setZlNazwa(k?.nazwa || '');
     setKontrahenciSugestie([]);
 
-    // Adres (obsłuż ulica_nr/kod_pocztowy oraz alternatywne nazwy)
-    setZlUlica(
-      kontrahent.adres_json?.ulica ?? kontrahent.adres_json?.ulica_nr ?? '',
-    );
-    setZlMiasto(kontrahent.adres_json?.miasto || '');
-    setZlKodPocztowy(
-      kontrahent.adres_json?.kod ?? kontrahent.adres_json?.kod_pocztowy ?? '',
-    );
-    setZlPanstwo(kontrahent.adres_json?.panstwo || '');
+    // ✅ bezpiecznie rozpakuj JSON-y (obsługuje string lub obiekt)
+    const adres = safeParse(k?.adres_json, {});
+    const ids = safeParse(k?.identyfikatory_json, {});
+    const kontakty = safeParse(k?.kontakty_json, []);
 
-    // Identyfikatory
-    setVat(kontrahent.identyfikatory_json?.vat || '');
-    setZlNip(kontrahent.identyfikatory_json?.nip || '');
-    setZlRegon(kontrahent.identyfikatory_json?.regon || '');
-    setZlEori(kontrahent.identyfikatory_json?.eori || '');
-    setZlPesel(kontrahent.identyfikatory_json?.pesel || '');
+    // ✅ ADRES – priorytet jak w eksporcie: ulica_nr > ulica, kod_pocztowy > kod
+    setZlUlica(adres.ulica_nr ?? adres.ulica ?? '');
+    setZlMiasto(adres.miasto ?? '');
+    setZlKodPocztowy(adres.kod_pocztowy ?? adres.kod ?? '');
+    setZlPanstwo(adres.panstwo ?? '');
 
-    // Kontakt: preferuj kontakty_json[0], fallback na kontakt_json; uzupełniaj tylko puste pola
-    const firstContact =
-      (Array.isArray(kontrahent.kontakty_json) &&
-        kontrahent.kontakty_json[0]) ||
-      kontrahent.kontakt_json ||
-      null;
+    // ✅ IDENTYFIKATORY
+    setVat(ids.vat ?? '');
+    setZlNip(ids.nip ?? '');
+    setZlRegon(ids.regon ?? '');
+    setZlEori(ids.eori ?? '');
+    setZlPesel(ids.pesel ?? '');
 
-    if (firstContact) {
-      setOsobaKontaktowa((prev) => prev || firstContact.imie_nazwisko || '');
-      setTelefonKontaktowy((prev) => prev || firstContact.telefon || '');
-      setEmailKontaktowy((prev) => prev || firstContact.email || '');
-    }
+    // ✅ KONTAKT – uzupełniaj tylko puste pola
+    const first = Array.isArray(kontakty) ? kontakty[0] : null;
+    setOsobaKontaktowa((prev) => prev || (first?.imie_nazwisko ?? ''));
+    setTelefonKontaktowy((prev) => prev || (first?.telefon ?? ''));
+    setEmailKontaktowy((prev) => prev || (first?.email ?? ''));
   };
 
   return (

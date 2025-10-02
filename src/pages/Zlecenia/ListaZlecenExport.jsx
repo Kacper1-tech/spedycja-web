@@ -16,7 +16,9 @@ export default function ListaZlecenExport() {
   const { zlecenia } = useZaktualizowaniKontrahenci();
 
   useEffect(() => {
-    setFilteredRows(zlecenia);
+    const base = zlecenia || [];
+    setRows(base); // ✅ baza do filtrowania
+    setFilteredRows(base); // ✅ to, co wyświetlasz
   }, [zlecenia]);
 
   const handleSelectRow = (id) => {
@@ -64,12 +66,21 @@ export default function ListaZlecenExport() {
   };
 
   const handleFilterChange = (column, value) => {
-    const newFilters = { ...filters, [column]: value.toLowerCase() };
+    const v = (value ?? '').toString().toLowerCase().trim();
+
+    const newFilters = { ...filters };
+    if (v === '') {
+      delete newFilters[column]; // zdejmij filtr dla tej kolumny
+    } else {
+      newFilters[column] = v;
+    }
     setFilters(newFilters);
+
     setFilteredRows(
-      rows.filter((row) => {
+      (rows || []).filter((row) => {
         return Object.entries(newFilters).every(([key, val]) => {
           let cell = '';
+
           if (key === 'pickup_date') {
             cell = formatDateRange(row.pickup_date_start, row.pickup_date_end);
           } else if (key === 'delivery_date') {
@@ -79,10 +90,10 @@ export default function ListaZlecenExport() {
             );
           } else if (key === 'pickup_address') {
             const a = safeParseArray(row.adresy_odbioru_json)[0];
-            cell = a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+            cell = a ? `${a.kod || ''} ${a.miasto || ''}`.trim() : '';
           } else if (key === 'delivery_address') {
             const a = safeParseArray(row.adresy_dostawy_json)[0];
-            cell = a ? `${a.kod || '-'} ${a.miasto || '-'}` : '-';
+            cell = a ? `${a.kod || ''} ${a.miasto || ''}`.trim() : '';
           } else if (key === 'identyfikator') {
             cell =
               row.zl_vat ||
@@ -90,11 +101,12 @@ export default function ListaZlecenExport() {
               row.zl_regon ||
               row.zl_eori ||
               row.zl_pesel ||
-              '-';
+              '';
           } else {
-            cell = row[key] || '';
+            cell = row[key] ?? '';
           }
-          return cell.toString().toLowerCase().includes(val);
+
+          return String(cell).toLowerCase().includes(val);
         });
       }),
     );
@@ -123,8 +135,14 @@ export default function ListaZlecenExport() {
   };
 
   function safeParseArray(value) {
+    if (value == null) return [];
+    if (Array.isArray(value)) return value; // <-- najpierw obsłuż już-gotową tablicę (JSONB)
+    if (typeof value === 'object') {
+      // np. obiekt z backendu, nie string
+      return [];
+    }
     try {
-      const parsed = JSON.parse(value || '[]');
+      const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
